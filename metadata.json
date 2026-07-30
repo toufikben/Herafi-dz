@@ -1,0 +1,6 @@
+{
+  "name": "Herafi DZ",
+  "description": "Algerian manual workers and craftsmen directory with Wilaya filter, rating system, and direct contact.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
