@@ -90,21 +90,27 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
         description: String,
         skillsCsv: String
     ) {
+        val normalizedName = name.trim().take(80)
+        val normalizedPhone = phone.trim().take(24)
+        require(normalizedName.isNotBlank()) { "Craftsman name cannot be blank" }
+        require(normalizedPhone.isNotBlank()) { "Craftsman phone cannot be blank" }
+        require(wilayaCode in 1..58) { "Invalid Wilaya code" }
+
         val newWorker = CraftsmanEntity(
             id = "worker_${UUID.randomUUID()}",
-            name = name,
-            categoryKey = categoryKey,
-            phone = phone,
-            whatsapp = whatsapp.ifBlank { phone },
+            name = normalizedName,
+            categoryKey = categoryKey.trim().ifBlank { "BUILDER" },
+            phone = normalizedPhone,
+            whatsapp = whatsapp.trim().take(24).ifBlank { normalizedPhone },
             wilayaCode = wilayaCode,
-            commune = commune.ifBlank { "المركز" },
-            ratingScore = 0.0, // Initial score (Unrated / New worker)
+            commune = commune.trim().take(80).ifBlank { "المركز" },
+            ratingScore = 0.0,
             ratingCount = 0,
-            dailyRateDzd = dailyRateDzd,
-            isVerified = true,
-            yearsExperience = yearsExperience,
-            description = description,
-            skillsCsv = skillsCsv,
+            dailyRateDzd = dailyRateDzd.coerceIn(0, 10_000_000),
+            isVerified = false,
+            yearsExperience = yearsExperience.coerceIn(0, 80),
+            description = description.trim().take(1_000),
+            skillsCsv = skillsCsv.trim().take(500),
             avatarIndex = (0..11).random(),
             isUserCreated = true,
             distanceKmSimulated = 1.0

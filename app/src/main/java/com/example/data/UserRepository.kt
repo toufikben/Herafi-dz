@@ -15,7 +15,10 @@ class UserRepository(
     private val userDao: UserDao,
     context: Context
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("herafi_user_session", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences(
+        "herafi_user_session",
+        Context.MODE_PRIVATE
+    )
 
     suspend fun registerUser(
         fullName: String,
@@ -25,21 +28,26 @@ class UserRepository(
         phone: String = "",
         wilayaCode: Int = 16
     ): AuthResult {
+        val trimmedName = fullName.trim()
         val trimmedEmail = email.trim().lowercase()
-        if (fullName.isBlank()) return AuthResult.Error("error_name_empty")
-        if (trimmedEmail.isBlank() || !trimmedEmail.contains("@")) return AuthResult.Error("error_invalid_email")
-        if (password.length < 6) return AuthResult.Error("error_password_too_short")
+        if (trimmedName.isBlank()) return AuthResult.Error("error_name_empty")
+        if (trimmedEmail.isBlank() || !isValidEmail(trimmedEmail)) {
+            return AuthResult.Error("error_invalid_email")
+        }
+        if (password.length < 8) return AuthResult.Error("error_password_too_short")
 
         val existing = userDao.getUserByEmail(trimmedEmail)
         if (existing != null) {
             return AuthResult.Error("error_email_already_registered")
         }
 
+        val salt = PasswordHasher.newSalt()
         val newUser = UserEntity(
             id = UUID.randomUUID().toString(),
-            fullName = fullName.trim(),
+            fullName = trimmedName,
             email = trimmedEmail,
-            password = password,
+            passwordHash = PasswordHasher.hash(password, salt),
+            passwordSalt = salt,
             userType = userType,
             phone = phone.trim(),
             wilayaCode = wilayaCode
@@ -52,13 +60,15 @@ class UserRepository(
 
     suspend fun loginUser(email: String, password: String): AuthResult {
         val trimmedEmail = email.trim().lowercase()
-        if (trimmedEmail.isBlank()) return AuthResult.Error("error_invalid_email")
+        if (trimmedEmail.isBlank() || !isValidEmail(trimmedEmail)) {
+            return AuthResult.Error("error_invalid_email")
+        }
         if (password.isBlank()) return AuthResult.Error("error_password_empty")
 
         val user = userDao.getUserByEmail(trimmedEmail)
             ?: return AuthResult.Error("error_user_not_found")
 
-        if (user.password != password) {
+        if (!PasswordHasher.verify(password, user.passwordSalt, user.passwordHash)) {
             return AuthResult.Error("error_incorrect_password")
         }
 
@@ -77,5 +87,9 @@ class UserRepository(
 
     private fun saveSession(userId: String) {
         prefs.edit().putString("current_user_id", userId).apply()
+    }
+
+    private fun isValidEmail(email: String): Boolean {
+        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     }
 }

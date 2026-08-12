@@ -309,7 +309,7 @@ object Localization {
     }
 
     fun passwordLabel(lang: AppLanguage): String = when (lang) {
-        AppLanguage.AR -> "كلمة المرور (6 أرقام/أحرف على الأقل)"
+        AppLanguage.AR -> "كلمة المرور (8 أحرف/أرقام على الأقل)"
         AppLanguage.FR -> "Mot de passe"
         AppLanguage.EN -> "Password"
     }
@@ -374,9 +374,9 @@ object Localization {
             AppLanguage.EN -> "Invalid email address"
         }
         "error_password_too_short" -> when (lang) {
-            AppLanguage.AR -> "كلمة المرور يجب أن تكون 6 أحرف/أرقام على الأقل"
-            AppLanguage.FR -> "Mot de passe trop court (min 6 caractères)"
-            AppLanguage.EN -> "Password must be at least 6 characters"
+            AppLanguage.AR -> "كلمة المرور يجب أن تكون 8 أحرف/أرقام على الأقل"
+            AppLanguage.FR -> "Mot de passe trop court (min 8 caractères)"
+            AppLanguage.EN -> "Password must be at least 8 characters"
         }
         "error_password_empty" -> when (lang) {
             AppLanguage.AR -> "يرجى كتابة كلمة المرور"

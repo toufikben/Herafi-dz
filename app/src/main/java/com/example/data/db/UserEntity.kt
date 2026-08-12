@@ -9,10 +9,10 @@ data class UserEntity(
     val id: String,
     val fullName: String,
     val email: String,
-    val password: String,
+    val passwordHash: String,
+    val passwordSalt: String,
     val userType: String = "CLIENT", // "CLIENT" or "CRAFTSMAN"
     val phone: String = "",
     val wilayaCode: Int = 16,
     val createdAt: Long = System.currentTimeMillis()
 )
-
