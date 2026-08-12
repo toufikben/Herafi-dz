@@ -2,6 +2,7 @@ package com.example.data.remote
 
 import com.example.data.db.CraftsmanDao
 import com.example.data.db.CraftsmanEntity
+import com.example.data.db.ReviewEntity
 
 sealed interface SyncResult {
     data class Success(val importedCount: Int) : SyncResult
@@ -21,6 +22,29 @@ class SupabaseCraftsmanSync(
             SyncResult.Success(remote.size)
         }.getOrElse { error ->
             SyncResult.Failed(error.message ?: "Supabase request failed")
+        }
+    }
+
+    suspend fun refreshReviewsForCraftsman(craftsmanId: String): SyncResult {
+        if (api == null) return SyncResult.NotConfigured
+        val remoteId = craftsmanId.removePrefix("remote_")
+        return runCatching {
+            val reviews = api.getReviewsForCraftsman(remoteId)
+            reviews.forEach { review ->
+                dao.insertReview(
+                    ReviewEntity(
+                        id = "remote_${review.id}",
+                        craftsmanId = "remote_${review.craftsman_id}",
+                        reviewerName = "مستخدم Herafi DZ",
+                        scoreTen = review.score_ten.coerceIn(0.0, 10.0),
+                        comment = review.comment.trim().take(500),
+                        timestamp = System.currentTimeMillis()
+                    )
+                )
+            }
+            SyncResult.Success(reviews.size)
+        }.getOrElse { error ->
+            SyncResult.Failed(error.message ?: "Supabase reviews request failed")
         }
     }
 }

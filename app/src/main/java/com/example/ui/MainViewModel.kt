@@ -219,6 +219,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openCraftsmanDetails(id: String) {
         selectedCraftsmanId.value = id
+        viewModelScope.launch {
+            SupabaseCraftsmanSync(
+                dao = AppDatabase.getInstance(getApplication()).craftsmanDao(),
+                api = SupabaseApiProvider.create()
+            ).refreshReviewsForCraftsman(id)
+        }
     }
 
     fun closeCraftsmanDetails() {

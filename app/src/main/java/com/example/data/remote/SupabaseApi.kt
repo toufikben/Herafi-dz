@@ -22,6 +22,14 @@ interface SupabaseApi {
         @Query("select") select: String = "*",
         @Query("order") order: String = "rating_score.desc"
     ): List<RemoteCraftsman>
+
+    @GET("rest/v1/reviews")
+    @Headers("Accept-Profile: public")
+    suspend fun getReviewsForCraftsman(
+        @Query("craftsman_id") craftsmanId: String,
+        @Query("select") select: String = "*",
+        @Query("order") order: String = "created_at.desc"
+    ): List<RemoteReview>
 }
 
 data class RemoteCraftsman(
@@ -43,18 +51,30 @@ data class RemoteCraftsman(
     val rating_count: Int
 )
 
-private class SupabaseHeadersInterceptor : Interceptor {
+data class RemoteReview(
+    val id: String,
+    val craftsman_id: String,
+    val reviewer_id: String,
+    val score_ten: Double,
+    val comment: String,
+    val created_at: String
+)
+
+private class SupabaseHeadersInterceptor(
+    private val accessToken: String?
+) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder()
+        val builder = chain.request().newBuilder()
             .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
             .addHeader("Accept", "application/json")
-            .build()
+        if (!accessToken.isNullOrBlank()) builder.addHeader("Authorization", "Bearer $accessToken")
+        val request = builder.build()
         return chain.proceed(request)
     }
 }
 
 object SupabaseApiProvider {
-    fun create(): SupabaseApi? {
+    fun create(accessToken: String? = null): SupabaseApi? {
         val baseUrl = BuildConfig.SUPABASE_URL.trim().let {
             if (it.isBlank() || it.contains("YOUR_PROJECT_REF")) return null
             if (it.endsWith("/")) it else "$it/"
@@ -63,7 +83,7 @@ object SupabaseApiProvider {
             return null
         }
         val client = OkHttpClient.Builder()
-            .addInterceptor(SupabaseHeadersInterceptor())
+            .addInterceptor(SupabaseHeadersInterceptor(accessToken))
             .build()
         return Retrofit.Builder()
             .baseUrl(baseUrl)
