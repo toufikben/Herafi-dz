@@ -142,6 +142,10 @@ class UserRepository(
         return userDao.getUserById(savedUserId)
     }
 
+    fun getSupabaseAccessToken(): String? = prefs.getString("supabase_access_token", null)
+
+    fun getCurrentUserId(): String? = prefs.getString("current_user_id", null)
+
     fun logoutUser() {
         prefs.edit()
             .remove("current_user_id")
