@@ -33,6 +33,12 @@ interface SupabaseApi {
         @Query("order") order: String = "created_at.desc"
     ): List<RemoteReview>
 
+    @POST("rest/v1/profiles")
+    @Headers("Content-Profile: public", "Prefer: resolution=merge-duplicates, return=representation")
+    suspend fun upsertProfile(
+        @Body profile: UpsertProfileBody
+    ): List<RemoteProfile>
+
     @GET("rest/v1/service_requests")
     @Headers("Accept-Profile: public")
     suspend fun getServiceRequestsForCustomer(
@@ -74,6 +80,20 @@ data class RemoteReview(
     val score_ten: Double,
     val comment: String,
     val created_at: String
+)
+
+data class UpsertProfileBody(
+    val id: String,
+    val display_name: String,
+    val phone: String? = null,
+    val role: String = "customer"
+)
+
+data class RemoteProfile(
+    val id: String,
+    val display_name: String,
+    val phone: String? = null,
+    val role: String
 )
 
 data class CreateServiceRequestBody(

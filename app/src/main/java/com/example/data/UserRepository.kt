@@ -8,6 +8,7 @@ import com.example.data.remote.SupabaseAuthApi
 import com.example.data.remote.SupabaseAuthApiProvider
 import com.example.data.remote.SupabaseSignInRequest
 import com.example.data.remote.SupabaseSignUpRequest
+import com.example.data.remote.UpsertProfileBody
 import java.util.UUID
 
 sealed class AuthResult {
@@ -79,6 +80,7 @@ class UserRepository(
             )
             userDao.insertUser(newUser)
             saveSession(newUser.id, remote.accessToken, remote.refreshToken)
+            ensureRemoteProfile(newUser)
             return AuthResult.Success(newUser)
         }
 
@@ -123,6 +125,7 @@ class UserRepository(
                 wilayaCode = remoteUser.userMetadata?.get("wilaya_code")?.toIntOrNull() ?: 16
             ).also { userDao.insertUser(it) }
             saveSession(user.id, remote.accessToken, remote.refreshToken)
+            ensureRemoteProfile(user)
             return AuthResult.Success(user)
         }
 
@@ -145,6 +148,20 @@ class UserRepository(
     fun getSupabaseAccessToken(): String? = prefs.getString("supabase_access_token", null)
 
     fun getCurrentUserId(): String? = prefs.getString("current_user_id", null)
+
+    private suspend fun ensureRemoteProfile(user: UserEntity) {
+        val api = com.example.data.remote.SupabaseApiProvider.create(getSupabaseAccessToken()) ?: return
+        runCatching {
+            api.upsertProfile(
+                UpsertProfileBody(
+                    id = user.id,
+                    display_name = user.fullName,
+                    phone = user.phone.ifBlank { null },
+                    role = if (user.userType.equals("CRAFTSMAN", ignoreCase = true)) "craftsman" else "customer"
+                )
+            )
+        }
+    }
 
     fun logoutUser() {
         prefs.edit()

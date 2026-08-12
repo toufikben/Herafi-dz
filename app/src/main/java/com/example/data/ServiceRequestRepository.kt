@@ -51,7 +51,7 @@ class ServiceRequestRepository(
                 val remote = api.createServiceRequest(
                     CreateServiceRequestBody(
                         customer_id = customerId,
-                        craftsman_id = localRequest.craftsmanId,
+                        craftsman_id = localRequest.craftsmanId.toRemoteCraftsmanId(),
                         category_key = localRequest.categoryKey,
                         wilaya_code = localRequest.wilayaCode,
                         commune = localRequest.commune,
@@ -108,7 +108,7 @@ class ServiceRequestRepository(
             val remote = api.createServiceRequest(
                 CreateServiceRequestBody(
                     customer_id = customerId,
-                    craftsman_id = localRequest.craftsmanId,
+                    craftsman_id = localRequest.craftsmanId.toRemoteCraftsmanId(),
                     category_key = localRequest.categoryKey,
                     wilaya_code = localRequest.wilayaCode,
                     commune = localRequest.commune,
@@ -153,6 +153,9 @@ class ServiceRequestRepository(
             updatedAt = parseTimestamp(updated_at) ?: existing?.updatedAt ?: System.currentTimeMillis()
         )
     }
+
+    private fun String?.toRemoteCraftsmanId(): String? =
+        this?.takeIf { it.startsWith("remote_") }?.removePrefix("remote_")
 
     private fun parseTimestamp(value: String?): Long? = value?.let {
         runCatching {

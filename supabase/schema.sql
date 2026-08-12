@@ -13,6 +13,31 @@ create table if not exists public.profiles (
     updated_at timestamptz not null default now()
 );
 
+create or replace function public.handle_new_auth_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+    insert into public.profiles (id, display_name, phone, role)
+    values (
+        new.id,
+        left(coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)), 80),
+        nullif(left(coalesce(new.raw_user_meta_data ->> 'phone', ''), 30), ''),
+        case when lower(coalesce(new.raw_user_meta_data ->> 'user_type', 'CLIENT')) = 'craftsman'
+             then 'craftsman' else 'customer' end
+    )
+    on conflict (id) do update set
+        display_name = excluded.display_name,
+        phone = excluded.phone,
+        role = excluded.role,
+        updated_at = now();
+    return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_auth_user();
+
 create table if not exists public.craftsmen (
     id uuid primary key default gen_random_uuid(),
     owner_id uuid references public.profiles(id) on delete set null,
