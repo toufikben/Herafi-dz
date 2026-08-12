@@ -76,6 +76,12 @@ object Localization {
         AppLanguage.EN -> "WhatsApp"
     }
 
+    fun shareProfile(lang: AppLanguage): String = when (lang) {
+        AppLanguage.AR -> "مشاركة الملف"
+        AppLanguage.FR -> "Partager le profil"
+        AppLanguage.EN -> "Share profile"
+    }
+
     fun rateAndReview(lang: AppLanguage): String = when (lang) {
         AppLanguage.AR -> "إضافة تقييم للعمل"
         AppLanguage.FR -> "Évaluer cet artisan"

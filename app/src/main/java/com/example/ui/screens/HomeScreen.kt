@@ -77,6 +77,7 @@ import com.example.ui.components.AuthDialog
 import com.example.ui.components.CraftsmanCard
 import com.example.ui.components.CraftsmanDetailSheet
 import com.example.ui.components.FilterBar
+import com.example.ui.components.shareCraftsmanProfile
 import com.example.ui.components.RatingSubmissionDialog
 import com.example.ui.components.TradeCategoryChips
 import com.example.ui.theme.GoldAccent
@@ -455,6 +456,7 @@ fun HomeScreen(
                         language = language,
                         onDismiss = { viewModel.closeCraftsmanDetails() },
                         onToggleBookmark = { viewModel.toggleBookmark(craftsman.id) },
+                        onShareProfile = { shareCraftsmanProfile(context, craftsman, language) },
                         onOpenRatingDialog = { viewModel.openRatingDialog() }
                     )
                 }

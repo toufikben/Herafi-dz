@@ -54,16 +54,19 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
         tagsCsv: String,
         currentCraftsman: CraftsmanEntity?
     ) {
+        val normalizedComment = comment.trim().take(500)
+        val normalizedReviewer = reviewerName.trim().take(80).ifBlank { "مستعمل التطبيق" }
+        val normalizedScore = scoreTen.coerceIn(0.0, 10.0)
         val review = ReviewEntity(
             id = UUID.randomUUID().toString(),
             craftsmanId = craftsmanId,
-            reviewerName = if (reviewerName.isBlank()) "مستعمل التطبيق" else reviewerName,
-            scoreTen = scoreTen,
-            comment = comment,
-            qualityFinishScore = qualityScore,
-            punctualityScore = punctualityScore,
-            priceFairnessScore = priceScore,
-            tagsCsv = tagsCsv
+            reviewerName = normalizedReviewer,
+            scoreTen = normalizedScore,
+            comment = normalizedComment,
+            qualityFinishScore = qualityScore.coerceIn(0.0, 10.0),
+            punctualityScore = punctualityScore.coerceIn(0.0, 10.0),
+            priceFairnessScore = priceScore.coerceIn(0.0, 10.0),
+            tagsCsv = tagsCsv.trim().take(250)
         )
         dao.insertReview(review)
 
@@ -72,7 +75,7 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
             val oldCount = currentCraftsman.ratingCount
             val oldScore = currentCraftsman.ratingScore
             val newCount = oldCount + 1
-            val newAverage = ((oldScore * oldCount) + scoreTen) / newCount
+            val newAverage = ((oldScore * oldCount) + normalizedScore) / newCount
             val roundedAverage = Math.round(newAverage * 10.0) / 10.0
             dao.updateCraftsmanRating(craftsmanId, roundedAverage, newCount)
         }

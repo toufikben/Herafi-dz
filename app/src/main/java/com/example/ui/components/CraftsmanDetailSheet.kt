@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Verified
@@ -80,6 +81,7 @@ fun CraftsmanDetailSheet(
     language: AppLanguage,
     onDismiss: () -> Unit,
     onToggleBookmark: () -> Unit,
+    onShareProfile: () -> Unit,
     onOpenRatingDialog: () -> Unit
 ) {
     val context = LocalContext.current
@@ -129,13 +131,26 @@ fun CraftsmanDetailSheet(
                         )
                 )
 
-                IconButton(
-                    onClick = onDismiss,
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    IconButton(
+                        onClick = onShareProfile,
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = Localization.shareProfile(language),
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -446,6 +461,28 @@ fun CraftsmanDetailSheet(
             }
         }
     }
+}
+
+fun shareCraftsmanProfile(context: android.content.Context, craftsman: CraftsmanEntity, language: AppLanguage) {
+    val category = TradeCategories.getByKey(craftsman.categoryKey)
+    val wilaya = AlgeriaWilayas.getByCode(craftsman.wilayaCode)
+    val categoryName = when (language) {
+        AppLanguage.AR -> category.nameAr
+        AppLanguage.FR -> category.nameFr
+        AppLanguage.EN -> category.nameEn
+    }
+    val wilayaName = AlgeriaWilayas.getNameForLanguage(wilaya, language)
+    val text = buildString {
+        append("Herafi DZ - ${craftsman.name}\n")
+        append("$categoryName - $wilayaName (${craftsman.commune})\n")
+        append("${craftsman.description}\n")
+        append("الهاتف: ${craftsman.phone}")
+    }
+    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(android.content.Intent.createChooser(intent, "Herafi DZ"))
 }
 
 @Composable
