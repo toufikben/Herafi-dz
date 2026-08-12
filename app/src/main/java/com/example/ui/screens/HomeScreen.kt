@@ -80,6 +80,7 @@ import com.example.ui.components.FilterBar
 import com.example.ui.components.shareCraftsmanProfile
 import com.example.ui.components.RatingSubmissionDialog
 import com.example.ui.components.ServiceRequestDialog
+import com.example.ui.components.ServiceRequestsDialog
 import com.example.ui.components.TradeCategoryChips
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.NavyPrimary
@@ -100,6 +101,8 @@ fun HomeScreen(
     val showServiceRequestDialog by viewModel.showServiceRequestDialog.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val showAuthDialog by viewModel.showAuthDialog.collectAsStateWithLifecycle()
+    val showServiceRequestsDialog by viewModel.showServiceRequestsDialog.collectAsStateWithLifecycle()
+    val serviceRequests by viewModel.serviceRequests.collectAsStateWithLifecycle()
     val notificationMessage by viewModel.userNotification.collectAsStateWithLifecycle()
 
     val language = filterState.selectedLanguage
@@ -483,6 +486,7 @@ fun HomeScreen(
                         pendingAction = viewModel.pendingAuthAction,
                         onDismiss = { viewModel.closeAuthDialog() },
                         onLogout = { viewModel.logoutUser() },
+                        onOpenServiceRequests = { viewModel.openServiceRequests() },
                         onLogin = { email, password, onError ->
                             viewModel.loginUser(email, password, onError)
                         },
@@ -494,6 +498,16 @@ fun HomeScreen(
                                 fullName, email, password, categoryKey, phone, whatsapp, wilayaCode, commune, dailyRateDzd, yearsExperience, description, skillsCsv, onResult = onError
                             )
                         }
+                    )
+                }
+
+                if (showServiceRequestsDialog) {
+                    ServiceRequestsDialog(
+                        requests = serviceRequests,
+                        language = language,
+                        onDismiss = { viewModel.closeServiceRequests() },
+                        onRefresh = { viewModel.refreshServiceRequests() },
+                        onRetry = { viewModel.retryPendingServiceRequests() }
                     )
                 }
 

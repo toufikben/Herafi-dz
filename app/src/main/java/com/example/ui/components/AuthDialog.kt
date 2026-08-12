@@ -93,6 +93,7 @@ fun AuthDialog(
     pendingAction: String?,
     onDismiss: () -> Unit,
     onLogout: () -> Unit = {},
+    onOpenServiceRequests: () -> Unit = {},
     onLogin: (email: String, password: String, onError: (String?) -> Unit) -> Unit,
     onRegister: (fullName: String, email: String, password: String, onError: (String?) -> Unit) -> Unit,
     onRegisterCraftsman: (
@@ -239,6 +240,27 @@ fun AuthDialog(
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = {
+                                onOpenServiceRequests()
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("my_requests_button")
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.AR) "طلباتي" else if (language == AppLanguage.FR) "Mes demandes" else "My requests",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Button(
                             onClick = {

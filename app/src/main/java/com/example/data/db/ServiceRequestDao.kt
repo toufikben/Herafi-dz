@@ -14,6 +14,12 @@ interface ServiceRequestDao {
     @Query("SELECT * FROM service_requests WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): ServiceRequestEntity?
 
+    @Query("SELECT * FROM service_requests WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun findByRemoteId(remoteId: String): ServiceRequestEntity?
+
+    @Query("SELECT * FROM service_requests WHERE customerId = :customerId AND syncState IN ('pending', 'failed') ORDER BY createdAt ASC")
+    suspend fun getPendingForCustomer(customerId: String): List<ServiceRequestEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(request: ServiceRequestEntity)
 

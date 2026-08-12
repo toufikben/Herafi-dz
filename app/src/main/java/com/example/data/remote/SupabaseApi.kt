@@ -33,6 +33,14 @@ interface SupabaseApi {
         @Query("order") order: String = "created_at.desc"
     ): List<RemoteReview>
 
+    @GET("rest/v1/service_requests")
+    @Headers("Accept-Profile: public")
+    suspend fun getServiceRequestsForCustomer(
+        @Query("customer_id") customerId: String,
+        @Query("select") select: String = "*",
+        @Query("order") order: String = "created_at.desc"
+    ): List<RemoteServiceRequest>
+
     @POST("rest/v1/service_requests")
     @Headers("Content-Profile: public", "Prefer: return=representation")
     suspend fun createServiceRequest(
@@ -86,7 +94,9 @@ data class RemoteServiceRequest(
     val wilaya_code: String,
     val commune: String,
     val description: String,
-    val status: String
+    val status: String,
+    val created_at: String? = null,
+    val updated_at: String? = null
 )
 
 private class SupabaseHeadersInterceptor(

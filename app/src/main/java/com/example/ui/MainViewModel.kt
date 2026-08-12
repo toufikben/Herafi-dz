@@ -9,6 +9,7 @@ import com.example.data.ServiceRequestResult
 import com.example.data.db.AppDatabase
 import com.example.data.db.CraftsmanEntity
 import com.example.data.db.ReviewEntity
+import com.example.data.db.ServiceRequestEntity
 import com.example.data.remote.SupabaseApiProvider
 import com.example.data.remote.SupabaseCraftsmanSync
 import com.example.data.remote.SyncResult
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -49,7 +51,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val currentUser = MutableStateFlow<com.example.data.db.UserEntity?>(null)
     val showAuthDialog = MutableStateFlow(false)
-    var pendingAuthAction: String? = null // "RATE" or "ACCOUNT"
+    val showServiceRequestsDialog = MutableStateFlow(false)
+    val serviceRequests = MutableStateFlow<List<ServiceRequestEntity>>(emptyList())
+    var pendingAuthAction: String? = null // "RATE", "REQUEST_SERVICE", "REQUESTS" or "ACCOUNT"
 
     init {
         val database = AppDatabase.getInstance(application)
@@ -274,6 +278,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showServiceRequestDialog.value = false
     }
 
+    fun openServiceRequests() {
+        if (currentUser.value == null) {
+            pendingAuthAction = "REQUESTS"
+            showAuthDialog.value = true
+        } else {
+            showServiceRequestsDialog.value = true
+            refreshServiceRequests()
+        }
+    }
+
+    fun closeServiceRequests() {
+        showServiceRequestsDialog.value = false
+    }
+
+    fun refreshServiceRequests() {
+        viewModelScope.launch {
+            val synced = serviceRequestRepository.syncPendingRequests()
+            serviceRequests.value = serviceRequestRepository.getForCurrentUser().first()
+            val result = serviceRequestRepository.refreshCurrentUserRequests()
+            serviceRequests.value = serviceRequestRepository.getForCurrentUser().first()
+            if (synced > 0) userNotification.value = "تمت مزامنة $synced طلب"
+            if (result.isFailure && serviceRequests.value.any { it.syncState != ServiceRequestEntity.SYNCED }) {
+                userNotification.value = "توجد طلبات محلية بانتظار الاتصال"
+            }
+        }
+    }
+
+    fun retryPendingServiceRequests() {
+        refreshServiceRequests()
+    }
+
     fun submitServiceRequest(
         categoryKey: String,
         wilayaCode: String,
@@ -322,6 +357,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         showRatingDialog.value = true
                     } else if (pendingAuthAction == "REQUEST_SERVICE") {
                         showServiceRequestDialog.value = true
+                    } else if (pendingAuthAction == "REQUESTS") {
+                        showServiceRequestsDialog.value = true
+                        refreshServiceRequests()
                     }
                     pendingAuthAction = null
                     onResult(null)
@@ -351,6 +389,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         showRatingDialog.value = true
                     } else if (pendingAuthAction == "REQUEST_SERVICE") {
                         showServiceRequestDialog.value = true
+                    } else if (pendingAuthAction == "REQUESTS") {
+                        showServiceRequestsDialog.value = true
+                        refreshServiceRequests()
                     }
                     pendingAuthAction = null
                     onResult(null)
