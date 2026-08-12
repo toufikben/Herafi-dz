@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.CraftsmanRepository
+import com.example.data.ServiceRequestRepository
+import com.example.data.ServiceRequestResult
 import com.example.data.db.AppDatabase
 import com.example.data.db.CraftsmanEntity
 import com.example.data.db.ReviewEntity
@@ -43,6 +45,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: CraftsmanRepository
     private val userRepository: com.example.data.UserRepository
+    private lateinit var serviceRequestRepository: ServiceRequestRepository
 
     val currentUser = MutableStateFlow<com.example.data.db.UserEntity?>(null)
     val showAuthDialog = MutableStateFlow(false)
@@ -52,6 +55,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val database = AppDatabase.getInstance(application)
         repository = CraftsmanRepository(database.craftsmanDao())
         userRepository = com.example.data.UserRepository(database.userDao(), application)
+        serviceRequestRepository = ServiceRequestRepository(
+            dao = database.serviceRequestDao(),
+            userRepository = userRepository,
+            context = application
+        )
 
         viewModelScope.launch {
             currentUser.value = userRepository.getSavedUser()
@@ -186,6 +194,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Show Rating Dialog
     val showRatingDialog = MutableStateFlow(false)
 
+    // Show Service Request Dialog
+    val showServiceRequestDialog = MutableStateFlow(false)
+
     // Show Toast Message
     val userNotification = MutableStateFlow<String?>(null)
 
@@ -250,6 +261,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showRatingDialog.value = false
     }
 
+    fun openServiceRequestDialog() {
+        if (currentUser.value == null) {
+            pendingAuthAction = "REQUEST_SERVICE"
+            showAuthDialog.value = true
+        } else {
+            showServiceRequestDialog.value = true
+        }
+    }
+
+    fun closeServiceRequestDialog() {
+        showServiceRequestDialog.value = false
+    }
+
+    fun submitServiceRequest(
+        categoryKey: String,
+        wilayaCode: String,
+        commune: String,
+        description: String
+    ) {
+        val craftsmanId = selectedCraftsmanId.value ?: return
+        viewModelScope.launch {
+            when (val result = serviceRequestRepository.createRequest(
+                craftsmanId = craftsmanId,
+                categoryKey = categoryKey,
+                wilayaCode = wilayaCode,
+                commune = commune,
+                description = description
+            )) {
+                is ServiceRequestResult.Success -> userNotification.value = "تم إرسال طلب الخدمة إلى الحرفي"
+                is ServiceRequestResult.SavedOffline -> userNotification.value = "تم حفظ الطلب محليًا وسيتم إرساله عند توفر الاتصال"
+                is ServiceRequestResult.Error -> userNotification.value = when (result.message) {
+                    "auth_required" -> "يجب تسجيل الدخول لإرسال طلب خدمة"
+                    "description_invalid" -> "اكتب وصفًا بين 10 و2000 حرف"
+                    else -> "تعذر إنشاء طلب الخدمة"
+                }
+            }
+            showServiceRequestDialog.value = false
+        }
+    }
+
     fun openAuthDialog(action: String? = "ACCOUNT") {
         pendingAuthAction = action
         showAuthDialog.value = true
@@ -269,6 +320,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     userNotification.value = "تم تسجيل الدخول بنجاح! مرحباً ${res.user.fullName}"
                     if (pendingAuthAction == "RATE") {
                         showRatingDialog.value = true
+                    } else if (pendingAuthAction == "REQUEST_SERVICE") {
+                        showServiceRequestDialog.value = true
                     }
                     pendingAuthAction = null
                     onResult(null)
@@ -296,6 +349,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     userNotification.value = "تم إنشاء حساب الزبون بنجاح! مرحباً ${res.user.fullName}"
                     if (pendingAuthAction == "RATE") {
                         showRatingDialog.value = true
+                    } else if (pendingAuthAction == "REQUEST_SERVICE") {
+                        showServiceRequestDialog.value = true
                     }
                     pendingAuthAction = null
                     onResult(null)

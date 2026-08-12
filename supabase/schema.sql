@@ -54,6 +54,7 @@ create table if not exists public.bookmarks (
 create table if not exists public.service_requests (
     id uuid primary key default gen_random_uuid(),
     customer_id uuid not null references public.profiles(id) on delete cascade,
+    craftsman_id uuid references public.craftsmen(id) on delete set null,
     category_key text not null,
     wilaya_code text not null,
     commune text not null default '' check (char_length(commune) <= 100),
@@ -63,9 +64,12 @@ create table if not exists public.service_requests (
     updated_at timestamptz not null default now()
 );
 
+alter table public.service_requests add column if not exists craftsman_id uuid references public.craftsmen(id) on delete set null;
+
 create index if not exists craftsmen_search_idx on public.craftsmen (wilaya_code, category_key, status);
 create index if not exists reviews_craftsman_idx on public.reviews (craftsman_id, created_at desc);
 create index if not exists requests_customer_idx on public.service_requests (customer_id, created_at desc);
+create index if not exists requests_craftsman_idx on public.service_requests (craftsman_id, created_at desc);
 
 alter table public.profiles enable row level security;
 alter table public.craftsmen enable row level security;
@@ -86,6 +90,8 @@ drop policy if exists "users manage their bookmarks" on public.bookmarks;
 drop policy if exists "customers view their requests" on public.service_requests;
 drop policy if exists "customers create requests" on public.service_requests;
 drop policy if exists "customers update their requests" on public.service_requests;
+drop policy if exists "assigned craftsmen view requests" on public.service_requests;
+drop policy if exists "assigned craftsmen update requests" on public.service_requests;
 
 create policy "published craftsmen are public" on public.craftsmen
     for select using (status = 'published' or owner_id = auth.uid());
@@ -118,6 +124,16 @@ create policy "customers create requests" on public.service_requests
     for insert to authenticated with check (customer_id = auth.uid());
 create policy "customers update their requests" on public.service_requests
     for update to authenticated using (customer_id = auth.uid()) with check (customer_id = auth.uid());
+create policy "assigned craftsmen view requests" on public.service_requests
+    for select to authenticated using (
+        exists (select 1 from public.craftsmen c where c.id = craftsman_id and c.owner_id = auth.uid())
+    );
+create policy "assigned craftsmen update requests" on public.service_requests
+    for update to authenticated using (
+        exists (select 1 from public.craftsmen c where c.id = craftsman_id and c.owner_id = auth.uid())
+    ) with check (
+        exists (select 1 from public.craftsmen c where c.id = craftsman_id and c.owner_id = auth.uid())
+    );
 
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$

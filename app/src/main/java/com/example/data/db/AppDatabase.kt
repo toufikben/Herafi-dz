@@ -8,15 +8,41 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [CraftsmanEntity::class, ReviewEntity::class, BookmarkEntity::class, UserEntity::class],
-    version = 4,
+    entities = [CraftsmanEntity::class, ReviewEntity::class, BookmarkEntity::class, UserEntity::class, ServiceRequestEntity::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun craftsmanDao(): CraftsmanDao
     abstract fun userDao(): UserDao
+    abstract fun serviceRequestDao(): ServiceRequestDao
 
     companion object {
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS service_requests (
+                        id TEXT NOT NULL,
+                        remoteId TEXT,
+                        customerId TEXT NOT NULL,
+                        craftsmanId TEXT,
+                        categoryKey TEXT NOT NULL,
+                        wilayaCode TEXT NOT NULL,
+                        commune TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        syncState TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS service_requests_customer_idx ON service_requests(customerId, createdAt)")
+            }
+        }
+
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Old local users contained plaintext passwords. They cannot be safely
@@ -51,7 +77,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "herafi_dz_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -79,6 +79,7 @@ import com.example.ui.components.CraftsmanDetailSheet
 import com.example.ui.components.FilterBar
 import com.example.ui.components.shareCraftsmanProfile
 import com.example.ui.components.RatingSubmissionDialog
+import com.example.ui.components.ServiceRequestDialog
 import com.example.ui.components.TradeCategoryChips
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.NavyPrimary
@@ -96,6 +97,7 @@ fun HomeScreen(
     val selectedCraftsman by viewModel.selectedCraftsman.collectAsStateWithLifecycle()
     val selectedReviews by viewModel.selectedCraftsmanReviews.collectAsStateWithLifecycle()
     val showRatingDialog by viewModel.showRatingDialog.collectAsStateWithLifecycle()
+    val showServiceRequestDialog by viewModel.showServiceRequestDialog.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val showAuthDialog by viewModel.showAuthDialog.collectAsStateWithLifecycle()
     val notificationMessage by viewModel.userNotification.collectAsStateWithLifecycle()
@@ -457,7 +459,19 @@ fun HomeScreen(
                         onDismiss = { viewModel.closeCraftsmanDetails() },
                         onToggleBookmark = { viewModel.toggleBookmark(craftsman.id) },
                         onShareProfile = { shareCraftsmanProfile(context, craftsman, language) },
-                        onOpenRatingDialog = { viewModel.openRatingDialog() }
+                        onOpenRatingDialog = { viewModel.openRatingDialog() },
+                        onRequestService = { viewModel.openServiceRequestDialog() }
+                    )
+                }
+
+                if (showServiceRequestDialog && selectedCraftsman != null) {
+                    ServiceRequestDialog(
+                        craftsman = selectedCraftsman!!,
+                        language = language,
+                        onDismiss = { viewModel.closeServiceRequestDialog() },
+                        onSubmit = { categoryKey, wilayaCode, commune, description ->
+                            viewModel.submitServiceRequest(categoryKey, wilayaCode, commune, description)
+                        }
                     )
                 }
 

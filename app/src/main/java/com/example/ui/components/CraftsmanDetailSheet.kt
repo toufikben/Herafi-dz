@@ -82,7 +82,8 @@ fun CraftsmanDetailSheet(
     onDismiss: () -> Unit,
     onToggleBookmark: () -> Unit,
     onShareProfile: () -> Unit,
-    onOpenRatingDialog: () -> Unit
+    onOpenRatingDialog: () -> Unit,
+    onRequestService: () -> Unit
 ) {
     val context = LocalContext.current
     val category = TradeCategories.getByKey(craftsman.categoryKey)
@@ -316,6 +317,27 @@ fun CraftsmanDetailSheet(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(text = Localization.whatsAppMsg(language), fontWeight = FontWeight.Bold)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = onRequestService,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("request_service_button")
+                    ) {
+                        Text(
+                            text = when (language) {
+                                AppLanguage.AR -> "طلب خدمة من هذا الحرفي"
+                                AppLanguage.FR -> "Demander un service"
+                                AppLanguage.EN -> "Request a service"
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))

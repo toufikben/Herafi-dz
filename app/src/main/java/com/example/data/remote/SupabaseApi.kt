@@ -6,8 +6,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
@@ -30,6 +32,12 @@ interface SupabaseApi {
         @Query("select") select: String = "*",
         @Query("order") order: String = "created_at.desc"
     ): List<RemoteReview>
+
+    @POST("rest/v1/service_requests")
+    @Headers("Content-Profile: public", "Prefer: return=representation")
+    suspend fun createServiceRequest(
+        @Body request: CreateServiceRequestBody
+    ): List<RemoteServiceRequest>
 }
 
 data class RemoteCraftsman(
@@ -58,6 +66,27 @@ data class RemoteReview(
     val score_ten: Double,
     val comment: String,
     val created_at: String
+)
+
+data class CreateServiceRequestBody(
+    val customer_id: String,
+    val craftsman_id: String?,
+    val category_key: String,
+    val wilaya_code: String,
+    val commune: String,
+    val description: String,
+    val status: String = "open"
+)
+
+data class RemoteServiceRequest(
+    val id: String,
+    val customer_id: String,
+    val craftsman_id: String?,
+    val category_key: String,
+    val wilaya_code: String,
+    val commune: String,
+    val description: String,
+    val status: String
 )
 
 private class SupabaseHeadersInterceptor(
