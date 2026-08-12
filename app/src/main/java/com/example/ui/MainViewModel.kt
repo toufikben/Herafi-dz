@@ -7,6 +7,9 @@ import com.example.data.CraftsmanRepository
 import com.example.data.db.AppDatabase
 import com.example.data.db.CraftsmanEntity
 import com.example.data.db.ReviewEntity
+import com.example.data.remote.SupabaseApiProvider
+import com.example.data.remote.SupabaseCraftsmanSync
+import com.example.data.remote.SyncResult
 import com.example.data.model.AppLanguage
 import com.example.data.model.SortOption
 import com.example.data.model.TradeCategories
@@ -52,6 +55,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             currentUser.value = userRepository.getSavedUser()
+        }
+
+        // Remote data is optional during migration. Room remains the immediate source of UI data.
+        viewModelScope.launch {
+            when (val result = SupabaseCraftsmanSync(
+                dao = database.craftsmanDao(),
+                api = SupabaseApiProvider.create()
+            ).refreshPublishedCraftsmen()) {
+                is SyncResult.Success -> if (result.importedCount > 0) {
+                    userNotification.value = "تم تحديث ${result.importedCount} حرفي من الخادم"
+                }
+                SyncResult.NotConfigured -> Unit
+                is SyncResult.Failed -> {
+                    // Keep the cached Room data usable; do not block the user on network failure.
+                    userNotification.value = "تعذر تحديث البيانات، يتم عرض النسخة المحلية"
+                }
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.Query
@@ -67,6 +68,7 @@ object SupabaseApiProvider {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
+            .addConverterFactory(MoshiConverterFactory.create())
             .build()
             .create(SupabaseApi::class.java)
     }
