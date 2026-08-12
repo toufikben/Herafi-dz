@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.db.UserDao
 import com.example.data.db.UserEntity
+import com.example.data.remote.SupabaseAuthApi
+import com.example.data.remote.SupabaseAuthApiProvider
+import com.example.data.remote.SupabaseSignInRequest
+import com.example.data.remote.SupabaseSignUpRequest
 import java.util.UUID
 
 sealed class AuthResult {
@@ -19,6 +23,7 @@ class UserRepository(
         "herafi_user_session",
         Context.MODE_PRIVATE
     )
+    private val supabaseAuth: SupabaseAuthApi? = SupabaseAuthApiProvider.create()
 
     suspend fun registerUser(
         fullName: String,
@@ -39,6 +44,42 @@ class UserRepository(
         val existing = userDao.getUserByEmail(trimmedEmail)
         if (existing != null) {
             return AuthResult.Error("error_email_already_registered")
+        }
+
+        if (supabaseAuth != null) {
+            val remote = runCatching {
+                supabaseAuth.signUp(
+                    SupabaseSignUpRequest(
+                        email = trimmedEmail,
+                        password = password,
+                        data = mapOf(
+                            "full_name" to trimmedName,
+                            "phone" to phone.trim(),
+                            "user_type" to userType,
+                            "wilaya_code" to wilayaCode.toString()
+                        )
+                    )
+                )
+            }.getOrElse { return AuthResult.Error("error_auth_network") }
+            val remoteUser = remote.user ?: return AuthResult.Error("error_email_already_registered")
+            if (remote.accessToken.isNullOrBlank()) {
+                return AuthResult.Error("error_email_confirmation_required")
+            }
+            val localSalt = PasswordHasher.newSalt()
+            val localShadowPassword = UUID.randomUUID().toString()
+            val newUser = UserEntity(
+                id = remoteUser.id,
+                fullName = trimmedName,
+                email = trimmedEmail,
+                passwordHash = PasswordHasher.hash(localShadowPassword, localSalt),
+                passwordSalt = localSalt,
+                userType = userType,
+                phone = phone.trim(),
+                wilayaCode = wilayaCode
+            )
+            userDao.insertUser(newUser)
+            saveSession(newUser.id, remote.accessToken, remote.refreshToken)
+            return AuthResult.Success(newUser)
         }
 
         val salt = PasswordHasher.newSalt()
@@ -65,6 +106,26 @@ class UserRepository(
         }
         if (password.isBlank()) return AuthResult.Error("error_password_empty")
 
+        if (supabaseAuth != null) {
+            val remote = runCatching {
+                supabaseAuth.signIn(SupabaseSignInRequest(trimmedEmail, password))
+            }.getOrElse { return AuthResult.Error("error_incorrect_password") }
+            val remoteUser = remote.user ?: return AuthResult.Error("error_user_not_found")
+            val existing = userDao.getUserById(remoteUser.id)
+            val user = existing ?: UserEntity(
+                id = remoteUser.id,
+                fullName = remoteUser.userMetadata?.get("full_name") ?: trimmedEmail.substringBefore("@"),
+                email = remoteUser.email ?: trimmedEmail,
+                passwordHash = "",
+                passwordSalt = "",
+                userType = remoteUser.userMetadata?.get("user_type") ?: "CLIENT",
+                phone = remoteUser.userMetadata?.get("phone") ?: "",
+                wilayaCode = remoteUser.userMetadata?.get("wilaya_code")?.toIntOrNull() ?: 16
+            ).also { userDao.insertUser(it) }
+            saveSession(user.id, remote.accessToken, remote.refreshToken)
+            return AuthResult.Success(user)
+        }
+
         val user = userDao.getUserByEmail(trimmedEmail)
             ?: return AuthResult.Error("error_user_not_found")
 
@@ -82,11 +143,21 @@ class UserRepository(
     }
 
     fun logoutUser() {
-        prefs.edit().remove("current_user_id").apply()
+        prefs.edit()
+            .remove("current_user_id")
+            .remove("supabase_access_token")
+            .remove("supabase_refresh_token")
+            .apply()
     }
 
-    private fun saveSession(userId: String) {
-        prefs.edit().putString("current_user_id", userId).apply()
+    private fun saveSession(userId: String, accessToken: String? = null, refreshToken: String? = null) {
+        prefs.edit()
+            .putString("current_user_id", userId)
+            .apply {
+                if (!accessToken.isNullOrBlank()) putString("supabase_access_token", accessToken)
+                if (!refreshToken.isNullOrBlank()) putString("supabase_refresh_token", refreshToken)
+            }
+            .apply()
     }
 
     private fun isValidEmail(email: String): Boolean {

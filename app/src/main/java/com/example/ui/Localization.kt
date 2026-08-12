@@ -404,6 +404,16 @@ object Localization {
             AppLanguage.FR -> "Mot de passe incorrect"
             AppLanguage.EN -> "Incorrect password"
         }
+        "error_auth_network" -> when (lang) {
+            AppLanguage.AR -> "تعذر الاتصال بخدمة الحسابات. تحقق من الإنترنت وحاول مرة أخرى."
+            AppLanguage.FR -> "Connexion au service de comptes impossible. Vérifiez Internet et réessayez."
+            AppLanguage.EN -> "Unable to connect to the account service. Check your internet connection and try again."
+        }
+        "error_email_confirmation_required" -> when (lang) {
+            AppLanguage.AR -> "تم إنشاء الحساب. يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول."
+            AppLanguage.FR -> "Compte créé. Confirmez votre adresse email avant de vous connecter."
+            AppLanguage.EN -> "Account created. Confirm your email address before signing in."
+        }
         else -> key
     }
 }
