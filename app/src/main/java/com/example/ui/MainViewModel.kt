@@ -53,6 +53,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showAuthDialog = MutableStateFlow(false)
     val showServiceRequestsDialog = MutableStateFlow(false)
     val serviceRequests = MutableStateFlow<List<ServiceRequestEntity>>(emptyList())
+    val userNotification = MutableStateFlow<String?>(null)
     var pendingAuthAction: String? = null // "RATE", "REQUEST_SERVICE", "REQUESTS" or "ACCOUNT"
 
     init {
@@ -81,7 +82,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 SyncResult.NotConfigured -> Unit
                 is SyncResult.Failed -> {
                     // Keep the cached Room data usable; do not block the user on network failure.
-                    userNotification.value = "تعذر تحديث البيانات، يتم عرض النسخة المحلية"
+                    userNotification.value = buildString {
+                        append("تعذر تحديث البيانات، يتم عرض النسخة المحلية")
+                        result.httpCode?.let { append(" (HTTP $it)") }
+                        if (result.message.isNotBlank()) append(": ${result.message}")
+                    }.take(220)
                 }
             }
         }
@@ -200,9 +205,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Show Service Request Dialog
     val showServiceRequestDialog = MutableStateFlow(false)
-
-    // Show Toast Message
-    val userNotification = MutableStateFlow<String?>(null)
 
     fun selectCategory(categoryKey: String) {
         filterState.value = filterState.value.copy(selectedCategoryKey = categoryKey)

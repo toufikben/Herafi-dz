@@ -47,9 +47,10 @@ class UserRepository(
             return AuthResult.Error("error_email_already_registered")
         }
 
-        if (supabaseAuth != null) {
+        val authApi = supabaseAuth
+        if (authApi != null) {
             val remote = runCatching {
-                supabaseAuth.signUp(
+                authApi.signUp(
                     SupabaseSignUpRequest(
                         email = trimmedEmail,
                         password = password,
@@ -108,9 +109,10 @@ class UserRepository(
         }
         if (password.isBlank()) return AuthResult.Error("error_password_empty")
 
-        if (supabaseAuth != null) {
+        val authApi = supabaseAuth
+        if (authApi != null) {
             val remote = runCatching {
-                supabaseAuth.signIn(SupabaseSignInRequest(trimmedEmail, password))
+                authApi.signIn(SupabaseSignInRequest(trimmedEmail, password))
             }.getOrElse { return AuthResult.Error("error_incorrect_password") }
             val remoteUser = remote.user ?: return AuthResult.Error("error_user_not_found")
             val existing = userDao.getUserById(remoteUser.id)

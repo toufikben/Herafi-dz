@@ -157,6 +157,7 @@ fun CraftsmanDetailSheet(
                         contentDescription = "Close",
                         tint = Color.White
                     )
+                    }
                 }
 
                 Row(

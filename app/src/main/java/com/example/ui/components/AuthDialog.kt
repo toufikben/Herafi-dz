@@ -338,7 +338,9 @@ fun AuthDialog(
                                 Text(
                                     text = Localization.loginButton(language),
                                     fontWeight = if (!isRegisterMode) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (!isRegisterMode) NavyPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (!isRegisterMode) NavyPrimary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             },
                             modifier = Modifier.testTag("tab_login")
@@ -353,7 +355,9 @@ fun AuthDialog(
                                 Text(
                                     text = Localization.signUpButton(language),
                                     fontWeight = if (isRegisterMode) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isRegisterMode) NavyPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isRegisterMode) NavyPrimary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             },
                             modifier = Modifier.testTag("tab_signup")
@@ -409,7 +413,7 @@ fun AuthDialog(
                                 // Client Card
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedRole == "CLIENT") NavyPrimary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    color = if (selectedRole == "CLIENT") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier
                                         .weight(1f)
                                         .border(
@@ -438,7 +442,9 @@ fun AuthDialog(
                                             text = Localization.clientRole(language),
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = if (selectedRole == "CLIENT") FontWeight.Bold else FontWeight.Medium,
-                                            color = if (selectedRole == "CLIENT") NavyPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = if (selectedRole == "CLIENT") NavyPrimary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             textAlign = TextAlign.Center
                                         )
                                     }
@@ -447,7 +453,7 @@ fun AuthDialog(
                                 // Craftsman Card
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedRole == "CRAFTSMAN") GoldAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    color = if (selectedRole == "CRAFTSMAN") GoldAccent.copy(alpha = 0.28f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier
                                         .weight(1f)
                                         .border(
@@ -476,7 +482,9 @@ fun AuthDialog(
                                             text = Localization.craftsmanRole(language),
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = if (selectedRole == "CRAFTSMAN") FontWeight.Bold else FontWeight.Medium,
-                                            color = if (selectedRole == "CRAFTSMAN") NavyPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = if (selectedRole == "CRAFTSMAN") NavyPrimary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             textAlign = TextAlign.Center
                                         )
                                     }

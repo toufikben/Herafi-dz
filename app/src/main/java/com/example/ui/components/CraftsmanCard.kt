@@ -367,8 +367,11 @@ fun CraftsmanCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = Localization.directCall(language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -389,8 +392,11 @@ fun CraftsmanCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = Localization.whatsAppMsg(language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -401,7 +407,10 @@ fun CraftsmanCard(
                         onOpenRatingDialog()
                     },
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.testTag("rate_button_${craftsman.id}")
+                    modifier = Modifier
+                        .weight(0.82f)
+                        .testTag("rate_button_${craftsman.id}"),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Star,
@@ -412,9 +421,12 @@ fun CraftsmanCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (language == AppLanguage.AR) "قيّم" else if (language == AppLanguage.FR) "Noter" else "Rate",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = GoldAccent
+                        color = GoldAccent,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

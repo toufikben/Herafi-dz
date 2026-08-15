@@ -95,6 +95,7 @@ fun HomeScreen(
     val filterState by viewModel.filterState.collectAsStateWithLifecycle()
     val craftsmen by viewModel.filteredCraftsmen.collectAsStateWithLifecycle()
     val bookmarkIds by viewModel.bookmarkIds.collectAsStateWithLifecycle()
+    val bookmarkIdSet = bookmarkIds.toSet()
     val selectedCraftsman by viewModel.selectedCraftsman.collectAsStateWithLifecycle()
     val selectedReviews by viewModel.selectedCraftsmanReviews.collectAsStateWithLifecycle()
     val showRatingDialog by viewModel.showRatingDialog.collectAsStateWithLifecycle()
@@ -426,8 +427,11 @@ fun HomeScreen(
                                     }
                                 }
                             } else {
-                                items(craftsmen) { craftsman ->
-                                    val isBookmarked = bookmarkIds.contains(craftsman.id)
+                                items(
+                                    items = craftsmen,
+                                    key = { it.id }
+                                ) { craftsman ->
+                                    val isBookmarked = bookmarkIdSet.contains(craftsman.id)
                                     CraftsmanCard(
                                         craftsman = craftsman,
                                         isBookmarked = isBookmarked,
@@ -457,7 +461,7 @@ fun HomeScreen(
                     CraftsmanDetailSheet(
                         craftsman = craftsman,
                         reviews = selectedReviews,
-                        isBookmarked = bookmarkIds.contains(craftsman.id),
+                        isBookmarked = bookmarkIdSet.contains(craftsman.id),
                         language = language,
                         onDismiss = { viewModel.closeCraftsmanDetails() },
                         onToggleBookmark = { viewModel.toggleBookmark(craftsman.id) },

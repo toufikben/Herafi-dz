@@ -390,9 +390,9 @@ object Localization {
             AppLanguage.EN -> "Please enter your password"
         }
         "error_email_already_registered" -> when (lang) {
-            AppLanguage.AR -> "هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول."
-            AppLanguage.FR -> "Cet email est déjà enregistré. Veuillez vous connecter."
-            AppLanguage.EN -> "This email is already registered. Please log in."
+            AppLanguage.AR -> "هذا البريد مرتبط بحساب موجود أو بمحاولة تسجيل سابقة. أكّد البريد من الرسالة ثم سجّل الدخول."
+            AppLanguage.FR -> "Cet email est déjà associé à un compte ou à une inscription précédente. Confirmez l'email puis connectez-vous."
+            AppLanguage.EN -> "This email is linked to an existing account or a previous sign-up. Confirm the email, then log in."
         }
         "error_user_not_found" -> when (lang) {
             AppLanguage.AR -> "لم نجد حساباً بهذا البريد الإلكتروني"

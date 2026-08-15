@@ -3,11 +3,16 @@ package com.example.data.remote
 import com.example.data.db.CraftsmanDao
 import com.example.data.db.CraftsmanEntity
 import com.example.data.db.ReviewEntity
+import retrofit2.HttpException
+import java.io.IOException
 
 sealed interface SyncResult {
     data class Success(val importedCount: Int) : SyncResult
     data object NotConfigured : SyncResult
-    data class Failed(val message: String) : SyncResult
+    data class Failed(
+        val message: String,
+        val httpCode: Int? = null
+    ) : SyncResult
 }
 
 class SupabaseCraftsmanSync(
@@ -15,21 +20,21 @@ class SupabaseCraftsmanSync(
     private val api: SupabaseApi?
 ) {
     suspend fun refreshPublishedCraftsmen(): SyncResult {
-        if (api == null) return SyncResult.NotConfigured
+        val supabaseApi = api ?: return SyncResult.NotConfigured
         return runCatching {
-            val remote = api.getPublishedCraftsmen()
+            val remote = supabaseApi.getPublishedCraftsmen()
             dao.insertCraftsmen(remote.map { it.toLocalEntity() })
             SyncResult.Success(remote.size)
         }.getOrElse { error ->
-            SyncResult.Failed(error.message ?: "Supabase request failed")
+            error.toSyncFailure("Supabase request failed")
         }
     }
 
     suspend fun refreshReviewsForCraftsman(craftsmanId: String): SyncResult {
-        if (api == null) return SyncResult.NotConfigured
+        val supabaseApi = api ?: return SyncResult.NotConfigured
         val remoteId = craftsmanId.removePrefix("remote_")
         return runCatching {
-            val reviews = api.getReviewsForCraftsman(remoteId)
+            val reviews = supabaseApi.getReviewsForCraftsman(remoteId)
             reviews.forEach { review ->
                 dao.insertReview(
                     ReviewEntity(
@@ -44,9 +49,25 @@ class SupabaseCraftsmanSync(
             }
             SyncResult.Success(reviews.size)
         }.getOrElse { error ->
-            SyncResult.Failed(error.message ?: "Supabase reviews request failed")
+            error.toSyncFailure("Supabase reviews request failed")
         }
     }
+}
+
+private fun Throwable.toSyncFailure(defaultMessage: String): SyncResult.Failed {
+    val httpException = this as? HttpException
+    val code = httpException?.code()
+    val serverMessage = runCatching { httpException?.response()?.errorBody()?.string() }.getOrNull()
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    val message = when {
+        code != null && !serverMessage.isNullOrBlank() -> "HTTP $code: $serverMessage"
+        code != null -> "HTTP $code: ${httpException.message()}"
+        this is IOException -> "Network error: ${this.message ?: defaultMessage}"
+        !this.message.isNullOrBlank() -> this.message!!
+        else -> defaultMessage
+    }
+    return SyncResult.Failed(message = message.take(500), httpCode = code)
 }
 
 private fun RemoteCraftsman.toLocalEntity(): CraftsmanEntity {
