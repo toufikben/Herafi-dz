@@ -9,7 +9,10 @@ import com.example.data.remote.SupabaseAuthApiProvider
 import com.example.data.remote.SupabaseSignInRequest
 import com.example.data.remote.SupabaseSignUpRequest
 import com.example.data.remote.UpsertProfileBody
+import java.io.IOException
+import java.util.Locale
 import java.util.UUID
+import retrofit2.HttpException
 
 sealed class AuthResult {
     data class Success(val user: UserEntity) : AuthResult()
@@ -62,7 +65,9 @@ class UserRepository(
                         )
                     )
                 )
-            }.getOrElse { return AuthResult.Error("error_auth_network") }
+            }.getOrElse { throwable ->
+                return AuthResult.Error(classifyAuthError(throwable, isSignIn = false))
+            }
             val remoteUser = remote.user ?: return AuthResult.Error("error_email_already_registered")
             if (remote.accessToken.isNullOrBlank()) {
                 return AuthResult.Error("error_email_confirmation_required")
@@ -113,7 +118,9 @@ class UserRepository(
         if (authApi != null) {
             val remote = runCatching {
                 authApi.signIn(SupabaseSignInRequest(trimmedEmail, password))
-            }.getOrElse { return AuthResult.Error("error_incorrect_password") }
+            }.getOrElse { throwable ->
+                return AuthResult.Error(classifySignInError(throwable))
+            }
             val remoteUser = remote.user ?: return AuthResult.Error("error_user_not_found")
             val existing = userDao.getUserById(remoteUser.id)
             val user = existing ?: UserEntity(
@@ -150,6 +157,58 @@ class UserRepository(
     fun getSupabaseAccessToken(): String? = prefs.getString("supabase_access_token", null)
 
     fun getCurrentUserId(): String? = prefs.getString("current_user_id", null)
+
+    /**
+     * Converts transport/API failures into stable UI keys without exposing raw
+     * server responses, URLs, tokens, or implementation details to the user.
+     */
+    private fun classifySignInError(throwable: Throwable): String =
+        classifyAuthError(throwable, isSignIn = true)
+
+    private fun classifyAuthError(throwable: Throwable, isSignIn: Boolean): String {
+        if (throwable is IOException) return "error_auth_network"
+
+        if (throwable is HttpException) {
+            val statusCode = throwable.code()
+            val serverBody = runCatching {
+                throwable.response()?.errorBody()?.string().orEmpty()
+            }.getOrDefault("").lowercase(Locale.ROOT)
+
+            if (serverBody.contains("email not confirmed") ||
+                serverBody.contains("email_not_confirmed")
+            ) {
+                return "error_email_confirmation_required"
+            }
+
+            if (!isSignIn && (
+                    statusCode == 400 || statusCode == 422
+                ) && (
+                    serverBody.contains("already registered") ||
+                    serverBody.contains("already exists") ||
+                    serverBody.contains("user_already_exists")
+                )
+            ) {
+                return "error_email_already_registered"
+            }
+
+            if (isSignIn && statusCode == 400 && (
+                    serverBody.contains("invalid login credentials") ||
+                    serverBody.contains("invalid_credentials")
+                )
+            ) {
+                return "error_incorrect_password"
+            }
+
+            return when (statusCode) {
+                400, 401 -> if (isSignIn) "error_incorrect_password" else "error_auth_unknown"
+                429 -> "error_auth_rate_limited"
+                in 500..599 -> "error_auth_server"
+                else -> "error_auth_unknown"
+            }
+        }
+
+        return "error_auth_unknown"
+    }
 
     private suspend fun ensureRemoteProfile(user: UserEntity) {
         val api = com.example.data.remote.SupabaseApiProvider.create(getSupabaseAccessToken()) ?: return

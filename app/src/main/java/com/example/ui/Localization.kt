@@ -284,16 +284,17 @@ object Localization {
         AppLanguage.EN -> "I want to register as:"
     }
 
+    // Short labels keep role cards readable on narrow phones and in RTL layouts.
     fun clientRole(lang: AppLanguage): String = when (lang) {
-        AppLanguage.AR -> "زبون (أبحث عن حرفي)"
-        AppLanguage.FR -> "Client (Cherche artisan)"
-        AppLanguage.EN -> "Client (Looking for craftsman)"
+        AppLanguage.AR -> "زبون"
+        AppLanguage.FR -> "Client"
+        AppLanguage.EN -> "Client"
     }
 
     fun craftsmanRole(lang: AppLanguage): String = when (lang) {
-        AppLanguage.AR -> "حرفي (أقدم خدمات)"
-        AppLanguage.FR -> "Artisan (Prestataire)"
-        AppLanguage.EN -> "Craftsman (Service provider)"
+        AppLanguage.AR -> "حرفي"
+        AppLanguage.FR -> "Artisan"
+        AppLanguage.EN -> "Craftsman"
     }
 
     fun loginTitle(lang: AppLanguage): String = when (lang) {
@@ -413,6 +414,21 @@ object Localization {
             AppLanguage.AR -> "تم إنشاء الحساب. يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول."
             AppLanguage.FR -> "Compte créé. Confirmez votre adresse email avant de vous connecter."
             AppLanguage.EN -> "Account created. Confirm your email address before signing in."
+        }
+        "error_auth_rate_limited" -> when (lang) {
+            AppLanguage.AR -> "تمت محاولات كثيرة. انتظر قليلاً ثم حاول تسجيل الدخول مرة أخرى."
+            AppLanguage.FR -> "Trop de tentatives. Attendez un moment puis réessayez."
+            AppLanguage.EN -> "Too many attempts. Please wait a moment and try again."
+        }
+        "error_auth_server" -> when (lang) {
+            AppLanguage.AR -> "خدمة الحسابات تواجه مشكلة مؤقتة. حاول مرة أخرى بعد قليل."
+            AppLanguage.FR -> "Le service de comptes rencontre un problème temporaire. Réessayez plus tard."
+            AppLanguage.EN -> "The account service is temporarily unavailable. Please try again later."
+        }
+        "error_auth_unknown" -> when (lang) {
+            AppLanguage.AR -> "تعذر تسجيل الدخول بسبب خطأ غير متوقع. حاول مرة أخرى."
+            AppLanguage.FR -> "Connexion impossible en raison d'une erreur inattendue. Réessayez."
+            AppLanguage.EN -> "Sign-in failed due to an unexpected error. Please try again."
         }
         else -> key
     }

@@ -1,6 +1,9 @@
 package com.example.data.remote
 
 import com.example.BuildConfig
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -54,6 +57,7 @@ interface SupabaseApi {
     ): List<RemoteServiceRequest>
 }
 
+@JsonClass(generateAdapter = true)
 data class RemoteCraftsman(
     val id: String,
     val owner_id: String?,
@@ -73,6 +77,7 @@ data class RemoteCraftsman(
     val rating_count: Int
 )
 
+@JsonClass(generateAdapter = true)
 data class RemoteReview(
     val id: String,
     val craftsman_id: String,
@@ -82,6 +87,7 @@ data class RemoteReview(
     val created_at: String
 )
 
+@JsonClass(generateAdapter = true)
 data class UpsertProfileBody(
     val id: String,
     val display_name: String,
@@ -89,6 +95,7 @@ data class UpsertProfileBody(
     val role: String = "customer"
 )
 
+@JsonClass(generateAdapter = true)
 data class RemoteProfile(
     val id: String,
     val display_name: String,
@@ -96,6 +103,7 @@ data class RemoteProfile(
     val role: String
 )
 
+@JsonClass(generateAdapter = true)
 data class CreateServiceRequestBody(
     val customer_id: String,
     val craftsman_id: String?,
@@ -106,6 +114,7 @@ data class CreateServiceRequestBody(
     val status: String = "open"
 )
 
+@JsonClass(generateAdapter = true)
 data class RemoteServiceRequest(
     val id: String,
     val customer_id: String,
@@ -147,7 +156,13 @@ object SupabaseApiProvider {
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
-            .addConverterFactory(MoshiConverterFactory.create())
+            .addConverterFactory(
+                MoshiConverterFactory.create(
+                    Moshi.Builder()
+                        .addLast(KotlinJsonAdapterFactory())
+                        .build()
+                )
+            )
             .build()
             .create(SupabaseApi::class.java)
     }
