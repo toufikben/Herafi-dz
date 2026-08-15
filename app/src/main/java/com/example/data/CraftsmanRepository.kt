@@ -26,7 +26,7 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
         }
     }
 
-    fun getAllCraftsmen(): Flow<List<CraftsmanEntity>> = dao.getAllCraftsmen()
+    fun getAllCraftsmen(): Flow<List<CraftsmanEntity>> = dao.getAllCraftsmen(limit = Int.MAX_VALUE)
 
     fun getCraftsmanById(id: String): Flow<CraftsmanEntity?> = dao.getCraftsmanById(id)
 

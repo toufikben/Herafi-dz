@@ -24,7 +24,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 enum class MainTab {
@@ -110,17 +112,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    // Filtered Craftsmen
-    val filteredCraftsmen: StateFlow<List<CraftsmanEntity>> = combine(
+    // Pagination is intentionally kept in the ViewModel so Room remains the offline source.
+    private val craftsmenPageSize = 20
+    private val loadedCraftsmenCount = MutableStateFlow(craftsmenPageSize)
+
+    // Filter and sort the cached data once per relevant state change, then expose only the loaded page.
+    private val allFilteredCraftsmen: StateFlow<List<CraftsmanEntity>> = combine(
         allCraftsmen,
         filterState,
         bookmarkIds
     ) { craftsmen, filter, bookmarks ->
         var result = craftsmen
+        val bookmarkSet = bookmarks.toSet()
 
         // Tab filter
         if (filter.activeTab == MainTab.SAVED) {
-            result = result.filter { bookmarks.contains(it.id) }
+            result = result.filter { bookmarkSet.contains(it.id) }
         }
 
         // Category filter
@@ -174,11 +181,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SortOption.NEAREST -> result.sortedBy { it.distanceKmSimulated }
             SortOption.PRICE_LOW -> result.sortedBy { it.dailyRateDzd }
         }
+    }.flowOn(Dispatchers.Default).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val filteredCraftsmen: StateFlow<List<CraftsmanEntity>> = combine(
+        allFilteredCraftsmen,
+        loadedCraftsmenCount
+    ) { craftsmen, loadedCount ->
+        craftsmen.take(loadedCount)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    val hasMoreCraftsmen: StateFlow<Boolean> = combine(
+        allFilteredCraftsmen,
+        loadedCraftsmenCount
+    ) { craftsmen, loadedCount ->
+        loadedCount < craftsmen.size
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
+    private fun resetCraftsmenPagination() {
+        loadedCraftsmenCount.value = craftsmenPageSize
+    }
+
+    fun loadNextCraftsmenPage() {
+        if (hasMoreCraftsmen.value) {
+            loadedCraftsmenCount.value += craftsmenPageSize
+        }
+    }
 
     // Selected Craftsman for Details
     val selectedCraftsmanId = MutableStateFlow<String?>(null)
@@ -207,26 +246,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showServiceRequestDialog = MutableStateFlow(false)
 
     fun selectCategory(categoryKey: String) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(selectedCategoryKey = categoryKey)
     }
 
     fun selectWilaya(wilayaCode: Int) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(selectedWilayaCode = wilayaCode)
     }
 
     fun setSearchQuery(query: String) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(searchQuery = query)
     }
 
     fun setSortOption(sortOption: SortOption) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(sortOption = sortOption)
     }
 
     fun setMinRating(minScore: Double) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(minRatingScore = minScore)
     }
 
     fun setActiveTab(tab: MainTab) {
+        resetCraftsmenPagination()
         filterState.value = filterState.value.copy(activeTab = tab)
     }
 
@@ -453,18 +498,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         description = description,
                         skillsCsv = skillsCsv
                     )
-                    when (val sync = SupabaseCraftsmanSync(
+                    val syncResult = SupabaseCraftsmanSync(
                         dao = AppDatabase.getInstance(getApplication()).craftsmanDao(),
                         api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
                     ).upsertOwnedCraftsman(
                         ownerId = res.user.id,
-                        local = repository.getCraftsmanByOwnerId(res.user.id)!!
-                    )) {
-                        is SyncResult.Failed -> userNotification.value = "تم حفظ الملف محليًا، وستتم مزامنته عند توفر الاتصال"
-                        else -> Unit
-                    }
+                        local = repository.getCraftsmanByOwnerId(res.user.id)
+                            ?: error("local_craftsman_profile_missing")
+                    )
                     showAuthDialog.value = false
-                    userNotification.value = "تم تسجيلك كحرفي بنجاح! ملفك الحرفي أخيرًا متاح في دليل Herafi DZ"
+                    userNotification.value = if (syncResult is SyncResult.Failed) {
+                        "تم إنشاء الحساب وحفظ الملف محليًا، لكن تعذر رفعه للسحابة وسيعادَت المزامنة لاحقًا"
+                    } else {
+                        "تم تسجيلك كحرفي بنجاح! ملفك الحرفي متاح في دليل Herafi DZ"
+                    }
                     pendingAuthAction = null
                     onResult(null)
                 }

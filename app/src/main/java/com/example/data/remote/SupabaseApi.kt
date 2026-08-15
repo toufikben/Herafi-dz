@@ -136,6 +136,7 @@ data class RemoteProfile(
 
 @JsonClass(generateAdapter = true)
 data class CreateServiceRequestBody(
+    val client_request_id: String,
     val customer_id: String,
     val craftsman_id: String?,
     val category_key: String,
@@ -148,6 +149,7 @@ data class CreateServiceRequestBody(
 @JsonClass(generateAdapter = true)
 data class RemoteServiceRequest(
     val id: String,
+    val client_request_id: String? = null,
     val customer_id: String,
     val craftsman_id: String?,
     val category_key: String,

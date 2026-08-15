@@ -39,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +62,15 @@ import com.example.ui.theme.PhoneBlue
 import com.example.ui.theme.RatingStarGold
 import com.example.ui.theme.WhatsAppGreen
 
+private val CraftsmanAvatarGradients = listOf(
+    listOf(Color(0xFF102A43), Color(0xFF243B53)),
+    listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
+    listOf(Color(0xFFB45309), Color(0xFFF59E0B)),
+    listOf(Color(0xFF3730A3), Color(0xFF6366F1)),
+    listOf(Color(0xFF9F1239), Color(0xFFF43F5E)),
+    listOf(Color(0xFF15803D), Color(0xFF22C55E))
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CraftsmanCard(
@@ -73,27 +83,34 @@ fun CraftsmanCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val category = TradeCategories.getByKey(craftsman.categoryKey)
-    val wilaya = AlgeriaWilayas.getByCode(craftsman.wilayaCode)
-
-    val categoryName = when (language) {
-        AppLanguage.AR -> category.nameAr
-        AppLanguage.FR -> category.nameFr
-        AppLanguage.EN -> category.nameEn
+    val category = remember(craftsman.categoryKey) {
+        TradeCategories.getByKey(craftsman.categoryKey)
+    }
+    val wilaya = remember(craftsman.wilayaCode) {
+        AlgeriaWilayas.getByCode(craftsman.wilayaCode)
     }
 
-    val wilayaName = AlgeriaWilayas.getNameForLanguage(wilaya, language)
+    val categoryName = remember(language, category) {
+        when (language) {
+            AppLanguage.AR -> category.nameAr
+            AppLanguage.FR -> category.nameFr
+            AppLanguage.EN -> category.nameEn
+        }
+    }
 
-    // Vibrant gradients for avatars
-    val avatarGradients = listOf(
-        listOf(Color(0xFF102A43), Color(0xFF243B53)),
-        listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
-        listOf(Color(0xFFB45309), Color(0xFFF59E0B)),
-        listOf(Color(0xFF3730A3), Color(0xFF6366F1)),
-        listOf(Color(0xFF9F1239), Color(0xFFF43F5E)),
-        listOf(Color(0xFF15803D), Color(0xFF22C55E))
-    )
-    val gradient = avatarGradients[craftsman.avatarIndex % avatarGradients.size]
+    val wilayaName = remember(wilaya, language) {
+        AlgeriaWilayas.getNameForLanguage(wilaya, language)
+    }
+    val visibleSkills = remember(craftsman.skillsCsv) {
+        craftsman.skillsCsv.split(',').asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .take(3)
+            .toList()
+    }
+    val gradient = CraftsmanAvatarGradients[
+        kotlin.math.abs(craftsman.avatarIndex) % CraftsmanAvatarGradients.size
+    ]
 
     Card(
         modifier = modifier
@@ -321,13 +338,13 @@ fun CraftsmanCard(
             }
 
             // Skills Chips
-            if (craftsman.skillsCsv.isNotBlank()) {
+            if (visibleSkills.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    craftsman.skillsCsv.split(",").take(3).forEach { skill ->
+                    visibleSkills.forEach { skill ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)

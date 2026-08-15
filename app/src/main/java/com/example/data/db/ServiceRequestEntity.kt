@@ -1,11 +1,16 @@
 package com.example.data.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "service_requests")
+@Entity(
+    tableName = "service_requests",
+    indices = [Index(value = ["customerId", "clientRequestId"], unique = true)]
+)
 data class ServiceRequestEntity(
-    @PrimaryKey val id: String,
+    @PrimaryKey     val id: String,
+    val clientRequestId: String = id,
     val remoteId: String? = null,
     val customerId: String,
     val craftsmanId: String? = null,

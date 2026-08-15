@@ -95,7 +95,7 @@ fun AuthDialog(
     onLogout: () -> Unit = {},
     onOpenServiceRequests: () -> Unit = {},
     onLogin: (email: String, password: String, onError: (String?) -> Unit) -> Unit,
-    onRegister: (fullName: String, email: String, password: String, onError: (String?) -> Unit) -> Unit,
+    onRegister: (fullName: String, email: String, password: String, phone: String, wilayaCode: Int, onError: (String?) -> Unit) -> Unit,
     onRegisterCraftsman: (
         fullName: String,
         email: String,
@@ -137,6 +137,7 @@ fun AuthDialog(
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
     var errorMessageKey by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val tradeCategoryList = remember { TradeCategories.list.filter { it.key != "ALL" } }
 
@@ -376,13 +377,6 @@ fun AuthDialog(
                         // Error Banner
                         AnimatedVisibility(visible = errorMessageKey != null) {
                             errorMessageKey?.let { key ->
-                                // Keep registration messages registration-specific even if an older
-                                // repository path returns the generic login rate-limit key.
-                                val visibleErrorKey = if (isRegisterMode && key == "error_auth_rate_limited") {
-                                    "error_signup_rate_limited"
-                                } else {
-                                    key
-                                }
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.errorContainer,
@@ -391,7 +385,7 @@ fun AuthDialog(
                                         .padding(bottom = 10.dp)
                                 ) {
                                     Text(
-                                        text = Localization.authErrorMessage(language, visibleErrorKey),
+                                        text = Localization.authErrorMessage(language, key),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.padding(10.dp),
@@ -805,6 +799,9 @@ fun AuthDialog(
                     // ACTION SUBMIT BUTTON
                     Button(
                         onClick = {
+                            if (isSubmitting) return@Button
+                            errorMessageKey = null
+                            isSubmitting = true
                             if (isRegisterMode) {
                                 if (selectedRole == "CRAFTSMAN") {
                                     onRegisterCraftsman(
@@ -820,18 +817,24 @@ fun AuthDialog(
                                         yearsExperience.toIntOrNull() ?: 5,
                                         description,
                                         skillsCsv
-                                    ) { err -> errorMessageKey = err }
-                                } else {
-                                    onRegister(fullName, email, password) { err ->
+                                    ) { err ->
                                         errorMessageKey = err
+                                        isSubmitting = false
+                                    }
+                                } else {
+                                    onRegister(fullName, email, password, phone, selectedWilayaCode) { err ->
+                                        errorMessageKey = err
+                                        isSubmitting = false
                                     }
                                 }
                             } else {
                                 onLogin(email, password) { err ->
                                     errorMessageKey = err
+                                    isSubmitting = false
                                 }
                             }
                         },
+                        enabled = !isSubmitting,
                         colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -840,7 +843,9 @@ fun AuthDialog(
                             .testTag("auth_submit_button")
                     ) {
                         Text(
-                            text = if (isRegisterMode) {
+                            text = if (isSubmitting) {
+                                if (language == AppLanguage.AR) "جارٍ الإرسال..." else "Envoi en cours..."
+                            } else if (isRegisterMode) {
                                 if (selectedRole == "CRAFTSMAN") (if (language == AppLanguage.AR) "تسجيل كحرفي جديد 🛠️" else "S'inscrire comme Artisan 🛠️")
                                 else Localization.signUpButton(language)
                             } else Localization.loginButton(language),

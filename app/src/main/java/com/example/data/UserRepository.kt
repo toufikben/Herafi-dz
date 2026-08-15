@@ -58,6 +58,7 @@ class UserRepository(
             .putString("supabase_refresh_token", legacyPrefs.getString("supabase_refresh_token", null))
             .apply()
         legacyPrefs.edit()
+            .remove("current_user_id")
             .remove("supabase_access_token")
             .remove("supabase_refresh_token")
             .apply()
@@ -245,7 +246,10 @@ class UserRepository(
 
             return when (statusCode) {
                 400, 401 -> if (isSignIn) "error_incorrect_password" else "error_auth_unknown"
-                429 -> if (isSignIn) "error_auth_rate_limited" else "error_signup_rate_limited"
+                // Rate limiting is a temporary server-side throttle; presenting a
+                // red "too many attempts" banner encourages repeated presses and
+                // repeated failed sign-ups. Treat it as a retryable hiccup instead.
+                429 -> if (isSignIn) "error_auth_server" else "error_auth_server"
                 in 500..599 -> "error_auth_server"
                 else -> "error_auth_unknown"
             }
@@ -281,7 +285,9 @@ class UserRepository(
             .putString("current_user_id", userId)
             .apply {
                 if (!accessToken.isNullOrBlank()) putString("supabase_access_token", accessToken)
+                else remove("supabase_access_token")
                 if (!refreshToken.isNullOrBlank()) putString("supabase_refresh_token", refreshToken)
+                else remove("supabase_refresh_token")
             }
             .apply()
     }

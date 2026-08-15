@@ -78,6 +78,7 @@ create table if not exists public.bookmarks (
 
 create table if not exists public.service_requests (
     id uuid primary key default gen_random_uuid(),
+    client_request_id uuid not null default gen_random_uuid(),
     customer_id uuid not null references public.profiles(id) on delete cascade,
     craftsman_id uuid references public.craftsmen(id) on delete set null,
     category_key text not null,
@@ -90,12 +91,17 @@ create table if not exists public.service_requests (
 );
 
 alter table public.service_requests add column if not exists craftsman_id uuid references public.craftsmen(id) on delete set null;
+alter table public.service_requests add column if not exists client_request_id uuid default gen_random_uuid();
+update public.service_requests set client_request_id = id where client_request_id is null;
+alter table public.service_requests alter column client_request_id set not null;
 
 create index if not exists craftsmen_search_idx on public.craftsmen (wilaya_code, category_key, status);
 create unique index if not exists craftsmen_owner_unique_idx
     on public.craftsmen (owner_id)
     where owner_id is not null;
 create index if not exists reviews_craftsman_idx on public.reviews (craftsman_id, created_at desc);
+create unique index if not exists requests_client_idempotency_idx
+    on public.service_requests (customer_id, client_request_id);
 create index if not exists requests_customer_idx on public.service_requests (customer_id, created_at desc);
 create index if not exists requests_craftsman_idx on public.service_requests (craftsman_id, created_at desc);
 
@@ -149,7 +155,14 @@ create policy "users manage their bookmarks" on public.bookmarks
 create policy "customers view their requests" on public.service_requests
     for select to authenticated using (customer_id = auth.uid());
 create policy "customers create requests" on public.service_requests
-    for insert to authenticated with check (customer_id = auth.uid());
+    for insert to authenticated with check (
+        customer_id = auth.uid()
+        and status = 'open'
+        and (craftsman_id is null or exists (
+            select 1 from public.craftsmen c
+            where c.id = craftsman_id and c.status = 'published'
+        ))
+    );
 create policy "customers update their requests" on public.service_requests
     for update to authenticated using (customer_id = auth.uid()) with check (customer_id = auth.uid());
 create policy "assigned craftsmen view requests" on public.service_requests

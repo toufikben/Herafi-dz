@@ -8,8 +8,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CraftsmanDao {
-    @Query("SELECT * FROM craftsmen ORDER BY ratingScore DESC")
-    fun getAllCraftsmen(): Flow<List<CraftsmanEntity>>
+    @Query("SELECT * FROM craftsmen ORDER BY ratingScore DESC LIMIT :limit")
+    fun getAllCraftsmen(limit: Int = Int.MAX_VALUE): Flow<List<CraftsmanEntity>>
+
+    @Query("SELECT COUNT(*) FROM craftsmen")
+    fun countCraftsmen(): kotlinx.coroutines.flow.Flow<Int>
 
     @Query("SELECT * FROM craftsmen WHERE id = :id")
     fun getCraftsmanById(id: String): Flow<CraftsmanEntity?>

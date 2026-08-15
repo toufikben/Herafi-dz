@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -52,6 +54,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +72,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.collect
 import com.example.R
 import com.example.data.model.AppLanguage
 import com.example.ui.Localization
@@ -94,8 +99,9 @@ fun HomeScreen(
     val context = LocalContext.current
     val filterState by viewModel.filterState.collectAsStateWithLifecycle()
     val craftsmen by viewModel.filteredCraftsmen.collectAsStateWithLifecycle()
+    val hasMoreCraftsmen by viewModel.hasMoreCraftsmen.collectAsStateWithLifecycle()
     val bookmarkIds by viewModel.bookmarkIds.collectAsStateWithLifecycle()
-    val bookmarkIdSet = bookmarkIds.toSet()
+    val bookmarkIdSet = remember(bookmarkIds) { bookmarkIds.toSet() }
     val selectedCraftsman by viewModel.selectedCraftsman.collectAsStateWithLifecycle()
     val selectedReviews by viewModel.selectedCraftsmanReviews.collectAsStateWithLifecycle()
     val showRatingDialog by viewModel.showRatingDialog.collectAsStateWithLifecycle()
@@ -108,6 +114,22 @@ fun HomeScreen(
 
     val language = filterState.selectedLanguage
     val layoutDirection = if (language.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    val craftsmanListState = rememberLazyListState()
+
+    // Prefetch the next batch as soon as the user is 5 items away from the end
+    // of the currently loaded list, so scrolling never stalls at the bottom.
+    LaunchedEffect(craftsmanListState, craftsmen.size, hasMoreCraftsmen) {
+        var requestedForSize = -1
+        snapshotFlow {
+            craftsmanListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        }.collect { lastVisibleIndex ->
+            val nearEnd = lastVisibleIndex >= craftsmen.size - 5
+            if (nearEnd && hasMoreCraftsmen && requestedForSize != craftsmen.size) {
+                requestedForSize = craftsmen.size
+                viewModel.loadNextCraftsmenPage()
+            }
+        }
+    }
 
     // Toast notifications
     LaunchedEffect(notificationMessage) {
@@ -277,6 +299,7 @@ fun HomeScreen(
                 when (filterState.activeTab) {
                     MainTab.EXPLORE, MainTab.SAVED -> {
                         LazyColumn(
+                            state = craftsmanListState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(bottom = 80.dp)
                         ) {
@@ -443,6 +466,23 @@ fun HomeScreen(
                                     )
                                 }
                             }
+
+                            if (hasMoreCraftsmen) {
+                                item(key = "craftsmen_loading_more") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 2.dp,
+                                            color = GoldAccent
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -494,8 +534,8 @@ fun HomeScreen(
                         onLogin = { email, password, onError ->
                             viewModel.loginUser(email, password, onError)
                         },
-                        onRegister = { fullName, email, password, onError ->
-                            viewModel.registerUser(fullName, email, password, onResult = onError)
+                        onRegister = { fullName, email, password, phone, wilayaCode, onError ->
+                            viewModel.registerUser(fullName, email, password, phone, wilayaCode, onResult = onError)
                         },
                         onRegisterCraftsman = { fullName, email, password, categoryKey, phone, whatsapp, wilayaCode, commune, dailyRateDzd, yearsExperience, description, skillsCsv, onError ->
                             viewModel.registerCraftsmanUser(

@@ -50,6 +50,7 @@ class ServiceRequestRepository(
             runCatching {
                 val remote = api.createServiceRequest(
                     CreateServiceRequestBody(
+                        client_request_id = localRequest.clientRequestId,
                         customer_id = customerId,
                         craftsman_id = localRequest.craftsmanId.toRemoteCraftsmanId(),
                         category_key = localRequest.categoryKey,
@@ -91,8 +92,9 @@ class ServiceRequestRepository(
         val localId = UUID.randomUUID().toString()
         val localRequest = ServiceRequestEntity(
             id = localId,
+            clientRequestId = localId,
             customerId = customerId,
-            craftsmanId = craftsmanId?.removePrefix("remote_"),
+            craftsmanId = craftsmanId,
             categoryKey = categoryKey.trim().take(80),
             wilayaCode = wilayaCode.trim().take(10),
             commune = commune.trim().take(100),
@@ -106,7 +108,8 @@ class ServiceRequestRepository(
             ?: return ServiceRequestResult.SavedOffline(localRequest)
         return runCatching {
             val remote = api.createServiceRequest(
-                CreateServiceRequestBody(
+                    CreateServiceRequestBody(
+                    client_request_id = localRequest.clientRequestId,
                     customer_id = customerId,
                     craftsman_id = localRequest.craftsmanId.toRemoteCraftsmanId(),
                     category_key = localRequest.categoryKey,
@@ -140,6 +143,7 @@ class ServiceRequestRepository(
         val existing = dao.findByRemoteId(id)
         return ServiceRequestEntity(
             id = existing?.id ?: "remote_$id",
+            clientRequestId = existing?.clientRequestId ?: client_request_id ?: id,
             remoteId = id,
             customerId = customerId,
             craftsmanId = craftsman_id,
@@ -155,7 +159,13 @@ class ServiceRequestRepository(
     }
 
     private fun String?.toRemoteCraftsmanId(): String? =
-        this?.takeIf { it.startsWith("remote_") }?.removePrefix("remote_")
+        this?.let { value ->
+            when {
+                value.startsWith("remote_") -> value.removePrefix("remote_")
+                runCatching { UUID.fromString(value) }.isSuccess -> value
+                else -> null
+            }
+        }
 
     private fun parseTimestamp(value: String?): Long? = value?.let {
         runCatching {

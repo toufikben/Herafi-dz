@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CraftsmanEntity::class, ReviewEntity::class, BookmarkEntity::class, UserEntity::class, ServiceRequestEntity::class],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +40,22 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS service_requests_customer_idx ON service_requests(customerId, createdAt)")
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS craftsmen_category_idx ON craftsmen(categoryKey)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS craftsmen_wilaya_idx ON craftsmen(wilayaCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS craftsmen_rating_idx ON craftsmen(ratingScore DESC)")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN clientRequestId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE service_requests SET clientRequestId = id WHERE clientRequestId = ''")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS service_requests_client_request_idx ON service_requests(customerId, clientRequestId)")
             }
         }
 
@@ -77,8 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "herafi_dz_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance
