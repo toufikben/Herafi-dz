@@ -22,5 +22,7 @@ data class CraftsmanEntity(
     val isAvailable: Boolean = true,
     val avatarIndex: Int = 0,
     val isUserCreated: Boolean = false,
-    val distanceKmSimulated: Double = 2.5
+    val distanceKmSimulated: Double = 2.5,
+    /** Supabase auth user that owns this profile, when it is user-created. */
+    val ownerId: String? = null
 )

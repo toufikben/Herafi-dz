@@ -20,6 +20,12 @@ interface CraftsmanDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCraftsmen(craftsmen: List<CraftsmanEntity>)
 
+    @Query("SELECT * FROM craftsmen WHERE ownerId = :ownerId LIMIT 1")
+    suspend fun getCraftsmanByOwnerId(ownerId: String): CraftsmanEntity?
+
+    @Query("DELETE FROM craftsmen WHERE ownerId = :ownerId AND id != :keepId")
+    suspend fun deleteOtherCraftsmanRowsForOwner(ownerId: String, keepId: String)
+
     @Query("UPDATE craftsmen SET ratingScore = :newScore, ratingCount = :newCount WHERE id = :id")
     suspend fun updateCraftsmanRating(id: String, newScore: Double, newCount: Int)
 

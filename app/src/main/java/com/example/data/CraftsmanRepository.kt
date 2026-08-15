@@ -30,6 +30,9 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
 
     fun getCraftsmanById(id: String): Flow<CraftsmanEntity?> = dao.getCraftsmanById(id)
 
+    suspend fun getCraftsmanByOwnerId(ownerId: String): CraftsmanEntity? =
+        dao.getCraftsmanByOwnerId(ownerId)
+
     fun getReviewsForCraftsman(craftsmanId: String): Flow<List<ReviewEntity>> =
         dao.getReviewsForCraftsman(craftsmanId)
 
@@ -82,6 +85,7 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
     }
 
     suspend fun registerNewCraftsman(
+        ownerId: String? = null,
         name: String,
         categoryKey: String,
         phone: String,
@@ -116,7 +120,8 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
             skillsCsv = skillsCsv.trim().take(500),
             avatarIndex = (0..11).random(),
             isUserCreated = true,
-            distanceKmSimulated = 1.0
+            distanceKmSimulated = 1.0,
+            ownerId = ownerId
         )
         dao.insertCraftsman(newWorker)
     }

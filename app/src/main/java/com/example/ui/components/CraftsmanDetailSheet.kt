@@ -55,6 +55,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -183,13 +185,19 @@ fun CraftsmanDetailSheet(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
                                 text = craftsman.name,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
                             if (craftsman.isVerified) {
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -204,7 +212,9 @@ fun CraftsmanDetailSheet(
                         Text(
                             text = "$categoryName • $wilayaName (${craftsman.commune})",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.9f)
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -278,7 +288,10 @@ fun CraftsmanDetailSheet(
                                     text = Localization.rateAndReview(language),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
-                                    color = Color.White
+                                    color = Color.White,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -297,12 +310,19 @@ fun CraftsmanDetailSheet(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .testTag("detail_call_button")
+                                .height(52.dp)
+                                .testTag("detail_call_button"),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(imageVector = Icons.Default.Call, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = Localization.directCall(language), fontWeight = FontWeight.Bold)
+                            Text(
+                                text = Localization.directCall(language),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                textAlign = TextAlign.Center
+                            )
                         }
 
                         Button(
@@ -311,12 +331,19 @@ fun CraftsmanDetailSheet(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .testTag("detail_whatsapp_button")
+                                .height(52.dp)
+                                .testTag("detail_whatsapp_button"),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(imageVector = Icons.Default.Message, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = Localization.whatsAppMsg(language), fontWeight = FontWeight.Bold)
+                            Text(
+                                text = Localization.whatsAppMsg(language),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
 

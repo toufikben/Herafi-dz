@@ -2,6 +2,8 @@ package com.example.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.example.data.db.UserDao
 import com.example.data.db.UserEntity
 import com.example.data.remote.SupabaseAuthApi
@@ -16,6 +18,11 @@ import retrofit2.HttpException
 
 sealed class AuthResult {
     data class Success(val user: UserEntity) : AuthResult()
+    data class EmailConfirmationRequired(
+        val email: String,
+        val userType: String,
+        val userId: String
+    ) : AuthResult()
     data class Error(val messageKey: String) : AuthResult()
 }
 
@@ -23,11 +30,38 @@ class UserRepository(
     private val userDao: UserDao,
     context: Context
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences(
+    private val legacyPrefs: SharedPreferences = context.getSharedPreferences(
         "herafi_user_session",
         Context.MODE_PRIVATE
     )
+    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        "herafi_user_session_secure",
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build(),
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
     private val supabaseAuth: SupabaseAuthApi? = SupabaseAuthApiProvider.create()
+
+    init {
+        migrateLegacySession()
+    }
+
+    private fun migrateLegacySession() {
+        if (prefs.getString("current_user_id", null) != null) return
+        val userId = legacyPrefs.getString("current_user_id", null) ?: return
+        prefs.edit()
+            .putString("current_user_id", userId)
+            .putString("supabase_access_token", legacyPrefs.getString("supabase_access_token", null))
+            .putString("supabase_refresh_token", legacyPrefs.getString("supabase_refresh_token", null))
+            .apply()
+        legacyPrefs.edit()
+            .remove("supabase_access_token")
+            .remove("supabase_refresh_token")
+            .apply()
+    }
 
     suspend fun registerUser(
         fullName: String,
@@ -45,11 +79,9 @@ class UserRepository(
         }
         if (password.length < 8) return AuthResult.Error("error_password_too_short")
 
+        // Supabase is authoritative when configured. A stale local row from a
+        // previous interrupted sign-up must not block a new cloud registration.
         val existing = userDao.getUserByEmail(trimmedEmail)
-        if (existing != null) {
-            return AuthResult.Error("error_email_already_registered")
-        }
-
         val authApi = supabaseAuth
         if (authApi != null) {
             val remote = runCatching {
@@ -68,9 +100,17 @@ class UserRepository(
             }.getOrElse { throwable ->
                 return AuthResult.Error(classifyAuthError(throwable, isSignIn = false))
             }
-            val remoteUser = remote.user ?: return AuthResult.Error("error_email_already_registered")
+            // A successful HTTP response without a user is not proof that the email exists.
+            // Keep the result neutral instead of showing a misleading duplicate-email message.
+            val remoteUser = remote.user ?: return AuthResult.Error("error_auth_unknown")
             if (remote.accessToken.isNullOrBlank()) {
-                return AuthResult.Error("error_email_confirmation_required")
+                // Supabase can return a user without a session when email confirmation
+                // is enabled. An empty identities list, however, denotes an existing
+                // account and must not be presented as a successful new registration.
+                if (remoteUser.identities?.isEmpty() == true) {
+                    return AuthResult.Error("error_email_already_registered")
+                }
+                return AuthResult.EmailConfirmationRequired(trimmedEmail, userType, remoteUser.id)
             }
             val localSalt = PasswordHasher.newSalt()
             val localShadowPassword = UUID.randomUUID().toString()
@@ -88,6 +128,10 @@ class UserRepository(
             saveSession(newUser.id, remote.accessToken, remote.refreshToken)
             ensureRemoteProfile(newUser)
             return AuthResult.Success(newUser)
+        }
+
+        if (existing != null) {
+            return AuthResult.Error("error_email_already_registered")
         }
 
         val salt = PasswordHasher.newSalt()
@@ -201,7 +245,7 @@ class UserRepository(
 
             return when (statusCode) {
                 400, 401 -> if (isSignIn) "error_incorrect_password" else "error_auth_unknown"
-                429 -> "error_auth_rate_limited"
+                429 -> if (isSignIn) "error_auth_rate_limited" else "error_signup_rate_limited"
                 in 500..599 -> "error_auth_server"
                 else -> "error_auth_unknown"
             }

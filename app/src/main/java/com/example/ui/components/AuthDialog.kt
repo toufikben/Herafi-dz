@@ -376,6 +376,13 @@ fun AuthDialog(
                         // Error Banner
                         AnimatedVisibility(visible = errorMessageKey != null) {
                             errorMessageKey?.let { key ->
+                                // Keep registration messages registration-specific even if an older
+                                // repository path returns the generic login rate-limit key.
+                                val visibleErrorKey = if (isRegisterMode && key == "error_auth_rate_limited") {
+                                    "error_signup_rate_limited"
+                                } else {
+                                    key
+                                }
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.errorContainer,
@@ -384,7 +391,7 @@ fun AuthDialog(
                                         .padding(bottom = 10.dp)
                                 ) {
                                     Text(
-                                        text = Localization.authErrorMessage(language, key),
+                                        text = Localization.authErrorMessage(language, visibleErrorKey),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         modifier = Modifier.padding(10.dp),
@@ -413,12 +420,12 @@ fun AuthDialog(
                                 // Client Card
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedRole == "CLIENT") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    color = if (selectedRole == "CLIENT") NavyPrimary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier
                                         .weight(1f)
                                         .border(
                                             width = if (selectedRole == "CLIENT") 2.dp else 1.dp,
-                                            color = if (selectedRole == "CLIENT") NavyPrimary else Color.Transparent,
+                                            color = if (selectedRole == "CLIENT") GoldAccent else Color.Transparent,
                                             shape = RoundedCornerShape(12.dp)
                                         )
                                         .clickable {
@@ -434,7 +441,7 @@ fun AuthDialog(
                                         Icon(
                                             imageVector = Icons.Default.Person,
                                             contentDescription = null,
-                                            tint = if (selectedRole == "CLIENT") NavyPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            tint = if (selectedRole == "CLIENT") Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(24.dp)
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
@@ -442,7 +449,7 @@ fun AuthDialog(
                                             text = Localization.clientRole(language),
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = if (selectedRole == "CLIENT") FontWeight.Bold else FontWeight.Medium,
-                                            color = if (selectedRole == "CLIENT") NavyPrimary else MaterialTheme.colorScheme.onSurface,
+                                            color = if (selectedRole == "CLIENT") Color.White else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             softWrap = false,
                                             textAlign = TextAlign.Center
@@ -453,7 +460,7 @@ fun AuthDialog(
                                 // Craftsman Card
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedRole == "CRAFTSMAN") GoldAccent.copy(alpha = 0.28f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    color = if (selectedRole == "CRAFTSMAN") GoldAccent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier
                                         .weight(1f)
                                         .border(

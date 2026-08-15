@@ -92,6 +92,9 @@ create table if not exists public.service_requests (
 alter table public.service_requests add column if not exists craftsman_id uuid references public.craftsmen(id) on delete set null;
 
 create index if not exists craftsmen_search_idx on public.craftsmen (wilaya_code, category_key, status);
+create unique index if not exists craftsmen_owner_unique_idx
+    on public.craftsmen (owner_id)
+    where owner_id is not null;
 create index if not exists reviews_craftsman_idx on public.reviews (craftsman_id, created_at desc);
 create index if not exists requests_customer_idx on public.service_requests (customer_id, created_at desc);
 create index if not exists requests_craftsman_idx on public.service_requests (craftsman_id, created_at desc);

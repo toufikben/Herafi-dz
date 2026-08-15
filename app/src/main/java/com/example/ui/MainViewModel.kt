@@ -353,6 +353,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             when (val res = userRepository.loginUser(email, password)) {
                 is com.example.data.AuthResult.Success -> {
                     currentUser.value = res.user
+                    if (res.user.userType.equals("CRAFTSMAN", ignoreCase = true)) {
+                        syncOwnedCraftsmanAfterLogin(res.user.id)
+                    }
                     showAuthDialog.value = false
                     userNotification.value = "تم تسجيل الدخول بنجاح! مرحباً ${res.user.fullName}"
                     if (pendingAuthAction == "RATE") {
@@ -365,6 +368,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     pendingAuthAction = null
                     onResult(null)
+                }
+                is com.example.data.AuthResult.EmailConfirmationRequired -> {
+                    onResult("error_email_confirmation_required")
                 }
                 is com.example.data.AuthResult.Error -> {
                     onResult(res.messageKey)
@@ -398,6 +404,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     pendingAuthAction = null
                     onResult(null)
                 }
+                is com.example.data.AuthResult.EmailConfirmationRequired -> {
+                    showAuthDialog.value = false
+                    userNotification.value = Localization.authErrorMessage(
+                        filterState.value.selectedLanguage,
+                        "email_confirmation_sent"
+                    )
+                    pendingAuthAction = null
+                    onResult(null)
+                }
                 is com.example.data.AuthResult.Error -> {
                     onResult(res.messageKey)
                 }
@@ -426,6 +441,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     currentUser.value = res.user
                     // Add craftsman profile to directory
                     repository.registerNewCraftsman(
+                        ownerId = res.user.id,
+                        name = fullName,
+                        categoryKey = categoryKey,
+                        phone = phone,
+                        whatsapp = whatsapp,
+                        wilayaCode = wilayaCode,
+                        commune = commune,
+                        dailyRateDzd = dailyRateDzd,
+                        yearsExperience = yearsExperience,
+                        description = description,
+                        skillsCsv = skillsCsv
+                    )
+                    when (val sync = SupabaseCraftsmanSync(
+                        dao = AppDatabase.getInstance(getApplication()).craftsmanDao(),
+                        api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+                    ).upsertOwnedCraftsman(
+                        ownerId = res.user.id,
+                        local = repository.getCraftsmanByOwnerId(res.user.id)!!
+                    )) {
+                        is SyncResult.Failed -> userNotification.value = "تم حفظ الملف محليًا، وستتم مزامنته عند توفر الاتصال"
+                        else -> Unit
+                    }
+                    showAuthDialog.value = false
+                    userNotification.value = "تم تسجيلك كحرفي بنجاح! ملفك الحرفي أخيرًا متاح في دليل Herafi DZ"
+                    pendingAuthAction = null
+                    onResult(null)
+                }
+                is com.example.data.AuthResult.EmailConfirmationRequired -> {
+                    repository.registerNewCraftsman(
+                        ownerId = res.userId,
                         name = fullName,
                         categoryKey = categoryKey,
                         phone = phone,
@@ -438,13 +483,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         skillsCsv = skillsCsv
                     )
                     showAuthDialog.value = false
-                    userNotification.value = "تم تسجيلك كحرفي بنجاح! ملفك الحرفي أخيرًا متاح في دليل Herafi DZ"
+                    userNotification.value = Localization.authErrorMessage(
+                        filterState.value.selectedLanguage,
+                        "email_confirmation_sent"
+                    )
                     pendingAuthAction = null
                     onResult(null)
                 }
                 is com.example.data.AuthResult.Error -> {
                     onResult(res.messageKey)
                 }
+            }
+        }
+    }
+
+    private fun syncOwnedCraftsmanAfterLogin(ownerId: String) {
+        viewModelScope.launch {
+            val sync = SupabaseCraftsmanSync(
+                dao = AppDatabase.getInstance(getApplication()).craftsmanDao(),
+                api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            )
+            val local = repository.getCraftsmanByOwnerId(ownerId)
+            val result = if (local != null) {
+                sync.upsertOwnedCraftsman(ownerId, local)
+            } else {
+                sync.restoreOwnedCraftsman(ownerId)
+            }
+            if (result is SyncResult.Failed) {
+                userNotification.value = "تعذر مزامنة ملفك الحرفي، يتم الاحتفاظ بالنسخة المحلية"
             }
         }
     }

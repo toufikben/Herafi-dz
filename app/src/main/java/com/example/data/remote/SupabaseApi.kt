@@ -36,6 +36,21 @@ interface SupabaseApi {
         @Query("order") order: String = "created_at.desc"
     ): List<RemoteReview>
 
+    @GET("rest/v1/craftsmen")
+    @Headers("Accept-Profile: public")
+    suspend fun getCraftsmanForOwner(
+        @Query("owner_id") ownerId: String,
+        @Query("select") select: String = "*",
+        @Query("limit") limit: Int = 1
+    ): List<RemoteCraftsman>
+
+    @POST("rest/v1/craftsmen")
+    @Headers("Content-Profile: public", "Prefer: resolution=merge-duplicates, return=representation")
+    suspend fun upsertOwnedCraftsman(
+        @Query("on_conflict") onConflict: String = "owner_id",
+        @Body profile: UpsertCraftsmanBody
+    ): List<RemoteCraftsman>
+
     @POST("rest/v1/profiles")
     @Headers("Content-Profile: public", "Prefer: resolution=merge-duplicates, return=representation")
     suspend fun upsertProfile(
@@ -85,6 +100,22 @@ data class RemoteReview(
     val score_ten: Double,
     val comment: String,
     val created_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class UpsertCraftsmanBody(
+    val owner_id: String,
+    val name: String,
+    val category_key: String,
+    val wilaya_code: String,
+    val commune: String,
+    val phone: String,
+    val whatsapp: String? = null,
+    val description: String = "",
+    val daily_rate_dzd: Int? = null,
+    val years_experience: Int = 0,
+    val skills_csv: String = "",
+    val status: String = "pending"
 )
 
 @JsonClass(generateAdapter = true)

@@ -30,6 +30,49 @@ class SupabaseCraftsmanSync(
         }
     }
 
+    suspend fun upsertOwnedCraftsman(ownerId: String, local: CraftsmanEntity): SyncResult {
+        val supabaseApi = api ?: return SyncResult.NotConfigured
+        return runCatching {
+            val body = UpsertCraftsmanBody(
+                owner_id = ownerId,
+                name = local.name.trim().take(80),
+                category_key = local.categoryKey.trim().ifBlank { "BUILDER" },
+                wilaya_code = local.wilayaCode.coerceIn(0, 58).toString(),
+                commune = local.commune.trim().take(80),
+                phone = local.phone.trim().take(24),
+                whatsapp = local.whatsapp.trim().take(24).ifBlank { null },
+                description = local.description.trim().take(1_000),
+                daily_rate_dzd = local.dailyRateDzd.coerceIn(0, 10_000_000),
+                years_experience = local.yearsExperience.coerceIn(0, 80),
+                skills_csv = local.skillsCsv.trim().take(500),
+                status = if (local.isAvailable) "published" else "pending"
+            )
+            val response = supabaseApi.upsertOwnedCraftsman(profile = body)
+            val remote = response.firstOrNull()
+                ?: throw IllegalStateException("Supabase returned no craftsman profile")
+            val restored = remote.toLocalEntity(ownerIdOverride = ownerId, userCreated = true)
+            dao.insertCraftsman(restored)
+            dao.deleteOtherCraftsmanRowsForOwner(ownerId, restored.id)
+            SyncResult.Success(1)
+        }.getOrElse { error ->
+            error.toSyncFailure("Supabase craftsman upsert failed")
+        }
+    }
+
+    suspend fun restoreOwnedCraftsman(ownerId: String): SyncResult {
+        val supabaseApi = api ?: return SyncResult.NotConfigured
+        return runCatching {
+            val remote = supabaseApi.getCraftsmanForOwner(ownerId = "eq.$ownerId").firstOrNull()
+            if (remote == null) return@runCatching SyncResult.Success(0)
+            val restored = remote.toLocalEntity(ownerIdOverride = ownerId, userCreated = true)
+            dao.insertCraftsman(restored)
+            dao.deleteOtherCraftsmanRowsForOwner(ownerId, restored.id)
+            SyncResult.Success(1)
+        }.getOrElse { error ->
+            error.toSyncFailure("Supabase craftsman restore failed")
+        }
+    }
+
     suspend fun refreshReviewsForCraftsman(craftsmanId: String): SyncResult {
         val supabaseApi = api ?: return SyncResult.NotConfigured
         val remoteId = craftsmanId.removePrefix("remote_")
@@ -70,7 +113,10 @@ private fun Throwable.toSyncFailure(defaultMessage: String): SyncResult.Failed {
     return SyncResult.Failed(message = message.take(500), httpCode = code)
 }
 
-private fun RemoteCraftsman.toLocalEntity(): CraftsmanEntity {
+private fun RemoteCraftsman.toLocalEntity(
+    ownerIdOverride: String? = owner_id,
+    userCreated: Boolean = false
+): CraftsmanEntity {
     val localId = "remote_$id"
     return CraftsmanEntity(
         id = localId,
@@ -89,7 +135,8 @@ private fun RemoteCraftsman.toLocalEntity(): CraftsmanEntity {
         skillsCsv = skills_csv.trim().take(500),
         isAvailable = status == "published",
         avatarIndex = kotlin.math.abs(id.hashCode()) % 12,
-        isUserCreated = false,
-        distanceKmSimulated = 0.0
+        isUserCreated = userCreated,
+        distanceKmSimulated = 0.0,
+        ownerId = ownerIdOverride
     )
 }

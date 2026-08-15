@@ -415,10 +415,20 @@ object Localization {
             AppLanguage.FR -> "Compte créé. Confirmez votre adresse email avant de vous connecter."
             AppLanguage.EN -> "Account created. Confirm your email address before signing in."
         }
+        "email_confirmation_sent" -> when (lang) {
+            AppLanguage.AR -> "تم إنشاء الحساب وإرسال رسالة تأكيد إلى بريدك الإلكتروني. افتح الرسالة ثم سجّل الدخول."
+            AppLanguage.FR -> "Compte créé. Un email de confirmation a été envoyé. Ouvrez-le puis connectez-vous."
+            AppLanguage.EN -> "Account created. A confirmation email was sent. Open it, then sign in."
+        }
         "error_auth_rate_limited" -> when (lang) {
             AppLanguage.AR -> "تمت محاولات كثيرة. انتظر قليلاً ثم حاول تسجيل الدخول مرة أخرى."
             AppLanguage.FR -> "Trop de tentatives. Attendez un moment puis réessayez."
             AppLanguage.EN -> "Too many attempts. Please wait a moment and try again."
+        }
+        "error_signup_rate_limited" -> when (lang) {
+            AppLanguage.AR -> "تم تجاوز عدد محاولات إنشاء الحساب. انتظر قليلاً ثم حاول مرة أخرى."
+            AppLanguage.FR -> "Trop de tentatives de création de compte. Attendez un moment puis réessayez."
+            AppLanguage.EN -> "Too many account creation attempts. Please wait a moment and try again."
         }
         "error_auth_server" -> when (lang) {
             AppLanguage.AR -> "خدمة الحسابات تواجه مشكلة مؤقتة. حاول مرة أخرى بعد قليل."
@@ -426,9 +436,9 @@ object Localization {
             AppLanguage.EN -> "The account service is temporarily unavailable. Please try again later."
         }
         "error_auth_unknown" -> when (lang) {
-            AppLanguage.AR -> "تعذر تسجيل الدخول بسبب خطأ غير متوقع. حاول مرة أخرى."
-            AppLanguage.FR -> "Connexion impossible en raison d'une erreur inattendue. Réessayez."
-            AppLanguage.EN -> "Sign-in failed due to an unexpected error. Please try again."
+            AppLanguage.AR -> "تعذر إتمام العملية بسبب خطأ غير متوقع. حاول مرة أخرى."
+            AppLanguage.FR -> "Opération impossible en raison d'une erreur inattendue. Réessayez."
+            AppLanguage.EN -> "The operation failed due to an unexpected error. Please try again."
         }
         else -> key
     }

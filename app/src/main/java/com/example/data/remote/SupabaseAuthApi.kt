@@ -27,10 +27,16 @@ data class SupabaseSignInRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class SupabaseAuthIdentity(
+    val id: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class SupabaseAuthUser(
     val id: String,
     val email: String? = null,
-    @Json(name = "user_metadata") val userMetadata: Map<String, String>? = null
+    @Json(name = "user_metadata") val userMetadata: Map<String, String>? = null,
+    val identities: List<SupabaseAuthIdentity>? = null
 )
 
 @JsonClass(generateAdapter = true)
