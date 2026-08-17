@@ -113,7 +113,7 @@ alter table public.service_requests enable row level security;
 
 drop policy if exists "published craftsmen are public" on public.craftsmen;
 drop policy if exists "authenticated users can propose craftsmen" on public.craftsmen;
-drop policy if exists "owners can update their pending craftsmen" on public.craftsmen;
+drop policy if exists "owners can manage own craftsmen" on public.craftsmen;
 drop policy if exists "profiles are visible to their owner" on public.profiles;
 drop policy if exists "users can create their profile" on public.profiles;
 drop policy if exists "users can update their profile" on public.profiles;
@@ -131,9 +131,9 @@ create policy "published craftsmen are public" on public.craftsmen
     for select using (status = 'published' or owner_id = auth.uid());
 create policy "authenticated users can propose craftsmen" on public.craftsmen
     for insert to authenticated with check (owner_id = auth.uid());
-create policy "owners can update their pending craftsmen" on public.craftsmen
-    for update to authenticated using (owner_id = auth.uid() and status = 'pending')
-    with check (owner_id = auth.uid() and status = 'pending');
+create policy "owners can manage own craftsmen" on public.craftsmen
+    for update to authenticated using (owner_id = auth.uid())
+    with check (owner_id = auth.uid());
 
 create policy "profiles are visible to their owner" on public.profiles
     for select to authenticated using (id = auth.uid());
