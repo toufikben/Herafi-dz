@@ -52,6 +52,7 @@ import com.example.data.remote.SupabaseStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.ui.Localization
 
 private const val MAX_PHOTOS = 3
 private const val MAX_PHOTO_BYTES: Long = 4L * 1024 * 1024
@@ -114,37 +115,13 @@ fun ServiceRequestDialog(
         }
     }
 
-    val photoLabel = when (language) {
-        AppLanguage.AR -> "صور (${pendingData.size}/$MAX_PHOTOS)"
-        AppLanguage.FR -> "Photos (${pendingData.size}/$MAX_PHOTOS)"
-        AppLanguage.EN -> "Photos (${pendingData.size}/$MAX_PHOTOS)"
-    }
-    val addPhotoLabel = when (language) {
-        AppLanguage.AR -> "إضافة صور (اختياري، حتى 3)"
-        AppLanguage.FR -> "Ajouter des photos (facultatif, max 3)"
-        AppLanguage.EN -> "Add photos (optional, up to 3)"
-    }
+    val photoLabel = Localization.Ui.text("photos_count", language, "size" to pendingData.size.toString(), "max" to MAX_PHOTOS.toString())
+    val addPhotoLabel = Localization.Ui.text("add_photos_label", language)
 
-    val title = when (language) {
-        AppLanguage.AR -> "طلب خدمة من ${craftsman.name}"
-        AppLanguage.FR -> "Demander un service à ${craftsman.name}"
-        AppLanguage.EN -> "Request a service from ${craftsman.name}"
-    }
-    val descriptionLabel = when (language) {
-        AppLanguage.AR -> "صف المشكلة أو الخدمة المطلوبة"
-        AppLanguage.FR -> "Décrivez le problème ou le service"
-        AppLanguage.EN -> "Describe the problem or service"
-    }
-    val submitLabel = when (language) {
-        AppLanguage.AR -> "إرسال الطلب"
-        AppLanguage.FR -> "Envoyer la demande"
-        AppLanguage.EN -> "Send request"
-    }
-    val uploadingLabel = when (language) {
-        AppLanguage.AR -> "جاري رفع الصور..."
-        AppLanguage.FR -> "Envoi des photos..."
-        AppLanguage.EN -> "Uploading photos..."
-    }
+    val title = Localization.Ui.text("request_dialog_title", language, "name" to craftsman.name)
+    val descriptionLabel = Localization.Ui.text("describe_placeholder", language)
+    val submitLabel = Localization.Ui.text("send_request_button", language)
+    val uploadingLabel = Localization.Ui.text("uploading_photos", language)
 
     fun submitRequest() {
         if (uploading) return
@@ -167,23 +144,26 @@ fun ServiceRequestDialog(
                         }.getOrElse { "__pending__:${Base64.encodeToString(bytes, Base64.NO_WRAP)}" }
                     }
                 }
+                // Keep the __pending__ placeholders (raw Base64 payloads) so the
+                // repository can persist them locally and re-upload them later
+                // when connectivity returns (offline-first photo flow).
                 uploadedUrls = newUrls.filter { !it.startsWith("__pending__:") }
                 onSubmit(
                     craftsman.categoryKey,
                     craftsman.wilayaCode.toString(),
                     commune.trim(),
                     description.trim(),
-                    uploadedUrls
+                    newUrls
                 )
             } catch (_: Throwable) {
-                uploadError = if (language == AppLanguage.AR) "تعذر الاتصال؛ سترفع الصور تلقائيًا عند عودة الإنترنت" else "Could not connect; photos will upload automatically when internet returns"
+                uploadError = Localization.Ui.text("connection_lost_photos", language)
                 // Even without photos, a description-only request still works.
                 onSubmit(
                     craftsman.categoryKey,
                     craftsman.wilayaCode.toString(),
                     commune.trim(),
                     description.trim(),
-                    uploadedUrls
+                    emptyList()
                 )
             } finally {
                 uploading = false
@@ -199,7 +179,7 @@ fun ServiceRequestDialog(
                 OutlinedTextField(
                     value = commune,
                     onValueChange = { commune = it.take(100) },
-                    label = { Text(if (language == AppLanguage.AR) "البلدية" else "Commune") },
+                    label = { Text(Localization.Ui.text("commune_label", language)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -215,7 +195,7 @@ fun ServiceRequestDialog(
                 )
                 if (error) {
                     Text(
-                        text = if (language == AppLanguage.AR) "اكتب وصفًا بين 10 و2000 حرف" else "Description must contain 10 to 2000 characters",
+                        text = Localization.Ui.text("description_hint", language),
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
@@ -289,7 +269,7 @@ fun ServiceRequestDialog(
         },
         dismissButton = {
             Button(onClick = onDismiss, enabled = !uploading) {
-                Text(if (language == AppLanguage.AR) "إلغاء" else "Cancel")
+                Text(Localization.Ui.text("cancel_button", language))
             }
         }
     )

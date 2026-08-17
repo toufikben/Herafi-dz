@@ -58,6 +58,7 @@ import com.example.data.model.AlgeriaWilayas
 import com.example.data.model.AppLanguage
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.ui.Localization
 
 private const val PASSWORD_MIN_LENGTH = 8
 
@@ -96,7 +97,7 @@ fun SettingsDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
-                text = "الإعدادات",
+                text = Localization.settingsTitle(language),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -118,7 +119,8 @@ fun SettingsDialog(
                             isUpdatingPassword = isUpdatingPassword,
                             passwordResult = passwordResult,
                             onChangePassword = onChangePassword,
-                            onLogout = onLogout
+                            onLogout = onLogout,
+                            language = language
                         )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     }
@@ -128,7 +130,8 @@ fun SettingsDialog(
                         craftsmenNotificationEnabled = craftsmenNotificationEnabled,
                         onToggleRequestNotifications = onToggleRequestNotifications,
                         onToggleCraftsmanNotifications = onToggleCraftsmanNotifications,
-                        onUpdateNotificationInterval = onUpdateNotificationInterval
+                        onUpdateNotificationInterval = onUpdateNotificationInterval,
+                        language = language
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     if (isCraftsman) {
@@ -137,7 +140,8 @@ fun SettingsDialog(
                             craftsmenNotificationEnabled = craftsmenNotificationEnabled,
                             onUpdateCraftsmanField = onUpdateCraftsmanField,
                             onToggleAvailability = onToggleCraftsmanAvailability,
-                            onResetCraftsman = onResetCraftsman
+                            onResetCraftsman = onResetCraftsman,
+                            language = language,
                         )
                     } else {
                         Card(
@@ -147,7 +151,7 @@ fun SettingsDialog(
                             )
                         ) {
                             Text(
-                                text = "يمكنك التسجيل كحرفي للحصول على خيارات إدارة ملفك الحرفي.",
+                                text = Localization.craftsmanClientHint(language),
                                 modifier = Modifier.padding(16.dp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -158,7 +162,7 @@ fun SettingsDialog(
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("إغلاق")
+                Text(Localization.settingsClose(language))
             }
         }
     )
@@ -170,6 +174,7 @@ private fun AccountSection(
     currentUser: UserEntity,
     isUpdatingPassword: Boolean,
     passwordResult: String?,
+    language: AppLanguage,
     onChangePassword: (String) -> Unit,
     onLogout: () -> Unit
 ) {
@@ -178,9 +183,9 @@ private fun AccountSection(
     var passwordError by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
 
-    SectionHeader(icon = Icons.Default.Password, title = "إعدادات الحساب")
+    SectionHeader(icon = Icons.Default.Password, title = Localization.accountSectionTitle(language))
     Text(
-        text = "المستخدم: ${currentUser.fullName}\nالبريد: ${currentUser.email}",
+        text = Localization.accountInfoLine(language, currentUser.fullName, currentUser.email),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface
     )
@@ -189,8 +194,8 @@ private fun AccountSection(
     OutlinedTextField(
         value = newPassword,
         onValueChange = { newPassword = it; passwordError = null },
-        label = { Text("كلمة المرور الجديدة") },
-        placeholder = { Text("8 أحرف على الأقل") },
+        label = { Text(Localization.newPasswordLabel(language)) },
+        placeholder = { Text(Localization.newPasswordPlaceholder(language)) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth()
@@ -199,7 +204,7 @@ private fun AccountSection(
     OutlinedTextField(
         value = confirmPassword,
         onValueChange = { confirmPassword = it; passwordError = null },
-        label = { Text("تأكيد كلمة المرور") },
+        label = { Text(Localization.confirmPasswordLabel(language)) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth()
@@ -211,9 +216,9 @@ private fun AccountSection(
         Spacer(modifier = Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (passwordResult?.contains("بنجاح") == true) Icons.Default.CheckCircle else Icons.Default.Close,
+                imageVector = if (passwordResult == Localization.Ui.text("password_changed_ok", language)) Icons.Default.CheckCircle else Icons.Default.Close,
                 contentDescription = null,
-                tint = if (passwordResult?.contains("بنجاح") == true)
+                tint = if (passwordResult == Localization.Ui.text("password_changed_ok", language))
                     MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.error,
                 modifier = Modifier.width(18.dp).height(18.dp)
@@ -221,7 +226,7 @@ private fun AccountSection(
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = resultText,
-                color = if (passwordResult?.contains("بنجاح") == true)
+                color = if (passwordResult == Localization.Ui.text("password_changed_ok", language))
                     MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
@@ -235,10 +240,10 @@ private fun AccountSection(
             onClick = {
                 when {
                     newPassword.length < PASSWORD_MIN_LENGTH -> {
-                        passwordError = "كلمة المرور يجب أن تكون 8 أحرف على الأقل"
+                        passwordError = Localization.passwordTooShortError(language)
                     }
                     newPassword != confirmPassword -> {
-                        passwordError = "كلمتا المرور غير متطابقتين"
+                        passwordError = Localization.passwordMismatchError(language)
                     }
                     else -> {
                         passwordError = null
@@ -252,11 +257,11 @@ private fun AccountSection(
             modifier = Modifier.weight(1f)
         ) {
             if (isUpdatingPassword) {
-                Text("جاري التحديث...")
+                Text(Localization.changePasswordUpdating(language))
             } else {
                 Icon(Icons.Default.Lock, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("تغيير كلمة المرور")
+                Text(Localization.changePasswordButton(language))
             }
         }
     }
@@ -271,7 +276,7 @@ private fun AccountSection(
     ) {
         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
         Spacer(modifier = Modifier.width(6.dp))
-        Text("تسجيل الخروج")
+        Text(Localization.logoutCaption(language))
     }
 }
 
@@ -283,15 +288,16 @@ private fun NotificationSection(
     craftsmenNotificationEnabled: Boolean,
     onToggleRequestNotifications: (Boolean) -> Unit,
     onToggleCraftsmanNotifications: (Boolean) -> Unit,
-    onUpdateNotificationInterval: (Int) -> Unit
+    onUpdateNotificationInterval: (Int) -> Unit,
+    language: AppLanguage,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val intervals = listOf(15, 30, 60)
 
-    SectionHeader(icon = Icons.Default.Notifications, title = "التنبيهات")
+    SectionHeader(icon = Icons.Default.Notifications, title = Localization.notificationsSectionTitle(language))
     ToggleRow(
-        title = "تنبيهات حالة الطلبات",
-        description = "إشعار عند تغير حالة طلبك أو وصول رد من حرفي",
+        title = Localization.requestNotificationsTitle(language),
+        description = Localization.requestNotificationsDescription(language),
         checked = requestNotificationsEnabled,
         onCheckedChange = onToggleRequestNotifications
     )
@@ -300,7 +306,7 @@ private fun NotificationSection(
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "تحديث كل:",
+                text = Localization.refreshIntervalLabel(language),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f)
             )
@@ -309,11 +315,7 @@ private fun NotificationSection(
                 onExpandedChange = { expanded = it }
             ) {
                 TextField(
-                    value = when (notificationIntervalSeconds) {
-                        15 -> "15 ثانية"
-                        60 -> "دقيقة"
-                        else -> "30 ثانية"
-                    },
+                    value = Localization.refreshIntervalValue(language, notificationIntervalSeconds),
                     onValueChange = {},
                     readOnly = true,
                     modifier = Modifier
@@ -330,13 +332,7 @@ private fun NotificationSection(
                     intervals.forEach { seconds ->
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    when (seconds) {
-                                        15 -> "15 ثانية (أسرع)"
-                                        60 -> "دقيقة (توفير طاقة)"
-                                        else -> "30 ثانية (افتراضي)"
-                                    }
-                                )
+                                Text(Localization.refreshIntervalOption(language, seconds))
                             },
                             onClick = {
                                 onUpdateNotificationInterval(seconds)
@@ -350,8 +346,8 @@ private fun NotificationSection(
     }
     Spacer(modifier = Modifier.height(8.dp))
     ToggleRow(
-        title = "تنبيهات الحرفيين",
-        description = "إشعار عند وصول حرفيين جدد أو تغير التقييمات",
+        title = Localization.craftsmanNotificationsTitle(language),
+        description = Localization.craftsmanNotificationsDescription(language),
         checked = craftsmenNotificationEnabled,
         onCheckedChange = onToggleCraftsmanNotifications
     )
@@ -364,7 +360,8 @@ private fun CraftsmanSection(
     craftsmenNotificationEnabled: Boolean,
     onUpdateCraftsmanField: (String, String) -> Unit,
     onToggleAvailability: (Boolean) -> Unit,
-    onResetCraftsman: () -> Unit
+    onResetCraftsman: () -> Unit,
+    language: AppLanguage,
 ) {
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -375,17 +372,17 @@ private fun CraftsmanSection(
     var wilayaExpanded by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<String?>(null) }
 
-    SectionHeader(icon = Icons.Default.Person, title = "ملف الحرفي")
+    SectionHeader(icon = Icons.Default.Person, title = Localization.craftsmanSectionTitle(language))
     ToggleRow(
-        title = "متاح لاستقبال الطلبات",
-        description = "إيقاف التوفر يخفيك من قائمة البحث مؤقتًا",
+        title = Localization.availabilityToggleTitle(language),
+        description = Localization.availabilityToggleDescription(language),
         checked = isAvailable,
         onCheckedChange = onToggleAvailability
     )
     Spacer(modifier = Modifier.height(12.dp))
 
     Text(
-        text = "تعديل معلومات ملفك (اكتب ما تريد تغييره فقط):",
+        text = Localization.editProfileHint(language),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -394,7 +391,7 @@ private fun CraftsmanSection(
     OutlinedTextField(
         value = name,
         onValueChange = { name = it; updateResult = null },
-        label = { Text("الاسم المهني") },
+        label = { Text(Localization.professionalNameLabel(language)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -402,7 +399,7 @@ private fun CraftsmanSection(
     OutlinedTextField(
         value = phone,
         onValueChange = { phone = it; updateResult = null },
-        label = { Text("الهاتف") },
+        label = { Text(Localization.phoneFieldLabel(language)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -415,10 +412,10 @@ private fun CraftsmanSection(
             modifier = Modifier.weight(1f)
         ) {
             TextField(
-                value = AlgeriaWilayas.list.find { it.code == wilayaCode }?.nameAr ?: "الجزائر العاصمة",
+                value = AlgeriaWilayas.list.find { it.code == wilayaCode }?.nameAr ?: Localization.Ui.text("wilaya_default", language),
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("الولاية") },
+                label = { Text(Localization.wilayaFieldLabel(language)) },
                 modifier = Modifier.menuAnchor(),
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = wilayaExpanded) },
                 colors = ExposedDropdownMenuDefaults.textFieldColors(),
@@ -443,7 +440,7 @@ private fun CraftsmanSection(
         OutlinedTextField(
             value = commune,
             onValueChange = { commune = it; updateResult = null },
-            label = { Text("البلدية") },
+            label = { Text(Localization.communeFieldLabel(language)) },
             singleLine = true,
             modifier = Modifier.weight(1f)
         )
@@ -452,7 +449,7 @@ private fun CraftsmanSection(
     OutlinedTextField(
         value = dailyRate,
         onValueChange = { dailyRate = it; updateResult = null },
-        label = { Text("الأجر اليومي (دج) — اختياري") },
+        label = { Text(Localization.dailyRateOptionalLabel(language)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -460,7 +457,7 @@ private fun CraftsmanSection(
     OutlinedTextField(
         value = description,
         onValueChange = { description = it; updateResult = null },
-        label = { Text("الوصف المهني") },
+        label = { Text(Localization.professionalDescriptionLabel(language)) },
         modifier = Modifier.fillMaxWidth().height(70.dp),
         maxLines = 3
     )
@@ -479,15 +476,14 @@ private fun CraftsmanSection(
         onClick = {
             val rateInt = dailyRate.toIntOrNull()
             onUpdateCraftsmanField("profile", "$name|$phone|$wilayaCode|$commune|$rateInt|$description")
-            wilayaCode = 16
-            updateResult = "تم تحديث ملفك"
+            updateResult = Localization.updateSuccess(language)
             name = ""; phone = ""; commune = ""; dailyRate = ""; description = ""
         },
         modifier = Modifier.fillMaxWidth()
     ) {
         Icon(Icons.Default.Edit, contentDescription = null)
         Spacer(modifier = Modifier.width(6.dp))
-        Text("حفظ التعديلات")
+        Text(Localization.saveEditsButton(language))
     }
     Spacer(modifier = Modifier.height(12.dp))
     OutlinedButton(
@@ -499,7 +495,7 @@ private fun CraftsmanSection(
     ) {
                 Icon(Icons.Default.DeleteForever, contentDescription = null)
         Spacer(modifier = Modifier.width(6.dp))
-        Text("حذف ملف الحرفي (إعادة التعيين)")
+        Text(Localization.resetCraftsmanButton(language))
     }
 }
 
@@ -517,11 +513,11 @@ private fun AppearanceSection(
     val themes = listOf("system", "light", "dark")
     val langs = listOf("ar", "fr", "en")
 
-    SectionHeader(icon = Icons.Default.Edit, title = "المظهر واللغة")
+    SectionHeader(icon = Icons.Default.Edit, title = Localization.appearanceSectionTitle(language))
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "المظهر:",
+            text = Localization.themeLabel(language),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
@@ -532,9 +528,9 @@ private fun AppearanceSection(
         ) {
             TextField(
                 value = when (themeMode) {
-                    "light" -> "فاتح"
-                    "dark" -> "داكن"
-                    else -> "اتبع النظام"
+                    "light" -> Localization.themeLight(language)
+                    "dark" -> Localization.themeDark(language)
+                    else -> Localization.themeSystem(language)
                 },
                 onValueChange = {},
                 readOnly = true,
@@ -548,15 +544,15 @@ private fun AppearanceSection(
                 onDismissRequest = { themeExpanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("اتبع النظام") },
+                    text = { Text(Localization.themeSystem(language)) },
                     onClick = { onThemeModeChange("system"); themeExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("فاتح") },
+                    text = { Text(Localization.themeLight(language)) },
                     onClick = { onThemeModeChange("light"); themeExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("داكن") },
+                    text = { Text(Localization.themeDark(language)) },
                     onClick = { onThemeModeChange("dark"); themeExpanded = false }
                 )
             }
@@ -565,7 +561,7 @@ private fun AppearanceSection(
     Spacer(modifier = Modifier.height(8.dp))
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "اللغة:",
+            text = Localization.languageLabel(language),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
@@ -599,7 +595,7 @@ private fun AppearanceSection(
     }
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text = "تغيير اللغة قد يتطلب إعادة تشغيل التطبيق لبعض الشاشات.",
+        text = Localization.languageChangeHint(language),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

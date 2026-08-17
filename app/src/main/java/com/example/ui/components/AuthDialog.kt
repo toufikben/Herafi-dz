@@ -200,7 +200,7 @@ fun AuthDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (currentUser.userType == "CRAFTSMAN") Icons.Default.Handyman else Icons.Default.Person,
+                                imageVector = if (currentUser.userType.equals("CRAFTSMAN", ignoreCase = true)) Icons.Default.Handyman else Icons.Default.Person,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(34.dp)
@@ -225,15 +225,15 @@ fun AuthDialog(
 
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (currentUser.userType == "CRAFTSMAN") GoldAccent.copy(alpha = 0.2f) else EmeraldGreen.copy(alpha = 0.15f)
+                            color = if (currentUser.userType.equals("CRAFTSMAN", ignoreCase = true)) GoldAccent.copy(alpha = 0.2f) else EmeraldGreen.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = if (currentUser.userType == "CRAFTSMAN") {
-                                    if (language == AppLanguage.AR) "حساب حرفي معتمد 🛠️" else "Compte Artisan 🛠️"
+                                text = if (currentUser.userType.equals("CRAFTSMAN", ignoreCase = true)) {
+                                    if (language == AppLanguage.AR) Localization.Ui.text("verified_craftsman_badge", language) else "Compte Artisan 🛠️"
                                 } else {
-                                    if (language == AppLanguage.AR) "حساب زبون مسجل 👤" else "Compte Client 👤"
+                                    if (language == AppLanguage.AR) Localization.Ui.text("verified_client_badge", language) else "Compte Client 👤"
                                 },
-                                color = if (currentUser.userType == "CRAFTSMAN") NavyPrimary else EmeraldGreen,
+                                color = if (currentUser.userType.equals("CRAFTSMAN", ignoreCase = true)) NavyPrimary else EmeraldGreen,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -255,7 +255,7 @@ fun AuthDialog(
                                 .testTag("my_requests_button")
                         ) {
                             Text(
-                                text = if (language == AppLanguage.AR) "طلباتي" else if (language == AppLanguage.FR) "Mes demandes" else "My requests",
+                                text = if (language == AppLanguage.AR) Localization.Ui.text("my_requests_title", language) else if (language == AppLanguage.FR) "Mes demandes" else "My requests",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
@@ -504,7 +504,7 @@ fun AuthDialog(
                                 label = {
                                     Text(
                                         if (selectedRole == "CRAFTSMAN") {
-                                            if (language == AppLanguage.AR) "اسم الحرفي / الورشة بالكامل" else "Nom complet / Atelier"
+                                            if (language == AppLanguage.AR) Localization.Ui.text("craftsman_name_placeholder", language) else "Nom complet / Atelier"
                                         } else Localization.fullName(language)
                                     )
                                 },
@@ -593,7 +593,7 @@ fun AuthDialog(
 
                             // TRADE CATEGORY DROPDOWN
                             Text(
-                                text = if (language == AppLanguage.AR) "اختر الحرفة / التخصص:" else "Spécialité / Métier :",
+                                text = if (language == AppLanguage.AR) Localization.Ui.text("choose_trade_placeholder", language) else "Spécialité / Métier :",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = NavyPrimary
@@ -673,7 +673,7 @@ fun AuthDialog(
                             OutlinedTextField(
                                 value = whatsapp,
                                 onValueChange = { whatsapp = it },
-                                label = { Text(if (language == AppLanguage.AR) "رقم الواتساب (اختياري)" else "Numéro WhatsApp") },
+                                label = { Text(if (language == AppLanguage.AR) Localization.Ui.text("whatsapp_optional_label", language) else "Numéro WhatsApp") },
                                 leadingIcon = { Icon(imageVector = Icons.Default.Chat, contentDescription = null) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
                                 singleLine = true,
@@ -844,9 +844,9 @@ fun AuthDialog(
                     ) {
                         Text(
                             text = if (isSubmitting) {
-                                if (language == AppLanguage.AR) "جارٍ الإرسال..." else "Envoi en cours..."
+                                if (language == AppLanguage.AR) Localization.Ui.text("sending_button", language) else "Envoi en cours..."
                             } else if (isRegisterMode) {
-                                if (selectedRole == "CRAFTSMAN") (if (language == AppLanguage.AR) "تسجيل كحرفي جديد 🛠️" else "S'inscrire comme Artisan 🛠️")
+                                if (selectedRole == "CRAFTSMAN") (if (language == AppLanguage.AR) Localization.Ui.text("register_as_craftsman_button", language) else "S'inscrire comme Artisan 🛠️")
                                 else Localization.signUpButton(language)
                             } else Localization.loginButton(language),
                             style = MaterialTheme.typography.titleMedium,

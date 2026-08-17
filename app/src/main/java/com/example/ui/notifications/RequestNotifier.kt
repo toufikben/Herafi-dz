@@ -10,6 +10,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.data.model.AppLanguage
+import com.example.data.prefs.AppPreferencesManager
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import com.example.ui.Localization
 
 /**
  * System notifications for service-request updates.
@@ -61,12 +66,16 @@ object RequestNotifier {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                val savedLang = runBlocking {
+                    AppPreferencesManager.language(context).first()
+                }
+                val channelLang = AppLanguage.entries.firstOrNull { it.code == savedLang } ?: AppLanguage.AR
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    "تحديثات طلبات الخدمة",
+                    Localization.Ui.text("new_notification_title", channelLang),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "إشعار عند وصول طلب خدمة جديد أو تغيّر حالة طلبك"
+                    description = Localization.Ui.text("new_notification_body", channelLang)
                     enableVibration(true)
                 }
                 manager.createNotificationChannel(channel)

@@ -78,11 +78,14 @@ fun RatingSubmissionDialog(
     var reviewerName by remember { mutableStateOf(currentUser?.fullName ?: "") }
     var comment by remember { mutableStateOf("") }
 
-    val availableTags = when (language) {
-        AppLanguage.AR -> listOf("دقة المواعيد", "عمل متقن", "سعر عادل", "نظافة الموقع", "احترام وأخلاق", "سريع ومحترف")
-        AppLanguage.FR -> listOf("Ponctuel", "Travail soigné", "Prix équitable", "Propreté", "Professionnel", "Rapide")
-        AppLanguage.EN -> listOf("Punctual", "Quality finish", "Fair price", "Clean job", "Respectful", "Fast worker")
-    }
+    val availableTags = listOf(
+        Localization.Ui.text("quick_on_time", language),
+        Localization.Ui.text("quick_quality", language),
+        Localization.Ui.text("quick_fair_price", language),
+        Localization.Ui.text("quick_clean", language),
+        Localization.Ui.text("quick_polite", language),
+        Localization.Ui.text("quick_professional", language)
+    )
 
     val selectedTags = remember { mutableStateOf(setOf(availableTags[0], availableTags[1])) }
 
@@ -275,7 +278,7 @@ fun RatingSubmissionDialog(
 
                 // Quality Tag Chips
                 Text(
-                    text = if (language == AppLanguage.AR) "كلمات دلالية للخدمة" else "Tags & Features",
+                    text = if (language == AppLanguage.AR) Localization.Ui.text("tags_label", language) else "Tags & Features",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )

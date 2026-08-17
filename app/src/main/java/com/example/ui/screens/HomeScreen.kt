@@ -196,7 +196,7 @@ fun HomeScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
-                                    contentDescription = "الإعدادات",
+                                    contentDescription = "Settings",
                                     tint = Color.White
                                 )
                             }
@@ -358,7 +358,7 @@ fun HomeScreen(
                                         verticalArrangement = Arrangement.Center
                                     ) {
                                         Text(
-                                            text = if (language == AppLanguage.AR) "ابحث عن أفضل الحرفيين والعمال في الجزائر"
+                                            text = if (language == AppLanguage.AR) Localization.Ui.text("home_search_subtitle", language)
                                             else "Trouvez les meilleurs artisans en Algérie",
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
@@ -366,7 +366,7 @@ fun HomeScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = if (language == AppLanguage.AR) "تقييم حقيقي 10/10 لاتخاذ القرار الصحيح لأعمالك"
+                                            text = if (language == AppLanguage.AR) Localization.Ui.text("home_rating_subtitle", language)
                                             else "Evaluations 10/10 vérifiées par les utilisateurs",
                                             color = GoldAccent,
                                             fontWeight = FontWeight.SemiBold,
@@ -575,7 +575,7 @@ fun HomeScreen(
                         onDismiss = { viewModel.closeServiceRequests() },
                         onRefresh = { viewModel.refreshServiceRequests() },
                         onRetry = { viewModel.retryPendingServiceRequests() },
-                        isCraftsman = currentUser?.userType == "craftsman",
+                        isCraftsman = currentUser?.userType.equals("CRAFTSMAN", ignoreCase = true),
                         onUpdateStatus = { remoteRequestId, newStatus ->
                             viewModel.updateServiceRequestStatus(remoteRequestId, newStatus)
                         }

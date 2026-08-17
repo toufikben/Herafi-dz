@@ -14,6 +14,7 @@ import com.example.data.remote.SupabaseApiProvider
 import com.example.data.remote.SupabaseCraftsmanSync
 import com.example.data.remote.SyncResult
 import com.example.data.model.AppLanguage
+import com.example.ui.Localization
 import com.example.data.prefs.AppPreferencesManager
 import com.example.data.model.SortOption
 import com.example.data.model.TradeCategories
@@ -66,6 +67,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val passwordUpdateResult = MutableStateFlow<String?>(null) // null | success message | error message
     val settingsThemeMode = MutableStateFlow("system") // system | light | dark
     val settingsSelectedLanguage = MutableStateFlow("ar")
+
+    // Current UI language used for all multi-language UI strings
+    val language: AppLanguage
+        get() {
+            val code = settingsSelectedLanguage.value
+            return AppLanguage.entries.firstOrNull { it.code == code } ?: AppLanguage.AR
+        }
     val serviceRequests = MutableStateFlow<List<ServiceRequestEntity>>(emptyList())
     val userNotification = MutableStateFlow<String?>(null)
     var pendingAuthAction: String? = null // "RATE", "REQUEST_SERVICE", "REQUESTS" or "ACCOUNT"
@@ -98,13 +106,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 api = SupabaseApiProvider.create()
             ).refreshPublishedCraftsmen()) {
                 is SyncResult.Success -> if (result.importedCount > 0) {
-                    userNotification.value = "تم تحديث ${result.importedCount} حرفي من الخادم"
+                    userNotification.value = Localization.Ui.text("update_success_count", language, "count" to result.importedCount.toString())
                 }
                 SyncResult.NotConfigured -> Unit
                 is SyncResult.Failed -> {
                     // Keep the cached Room data usable; do not block the user on network failure.
                     userNotification.value = buildString {
-                        append("تعذر تحديث البيانات، يتم عرض النسخة المحلية")
+                        append(Localization.Ui.text("update_failed_local", language))
                         result.httpCode?.let { append(" (HTTP $it)") }
                         if (result.message.isNotBlank()) append(": ${result.message}")
                     }.take(220)
@@ -369,9 +377,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             serviceRequests.value = serviceRequestRepository.getForCurrentUser().first()
             val result = serviceRequestRepository.refreshCurrentUserRequests()
             serviceRequests.value = serviceRequestRepository.getForCurrentUser().first()
-            if (synced > 0) userNotification.value = "تمت مزامنة $synced طلب"
+            if (synced > 0) userNotification.value = Localization.Ui.text("synced_banner", language, "count" to synced.toString())
             if (result.isFailure && serviceRequests.value.any { it.syncState != ServiceRequestEntity.SYNCED }) {
-                userNotification.value = "توجد طلبات محلية بانتظار الاتصال"
+                userNotification.value = Localization.Ui.text("pending_local_banner", language)
             }
         }
     }
@@ -384,10 +392,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = serviceRequestRepository.updateRequestStatusForCraftsman(remoteRequestId, newStatus)
             if (result.isSuccess) {
-                userNotification.value = "تم تحديث حالة الطلب"
+                userNotification.value = Localization.Ui.text("status_updated_ok", language)
                 refreshServiceRequests()
             } else {
-                userNotification.value = "تعذر تحديث حالة الطلب"
+                userNotification.value = Localization.Ui.text("status_updated_fail", language)
             }
         }
     }
@@ -410,7 +418,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     kotlinx.coroutines.delay(60_000L)
                     when (val result = sync.refreshPublishedCraftsmen()) {
                         is SyncResult.Success -> if (result.importedCount > 0) {
-                            userNotification.value = "تم تحديث ${result.importedCount} حرفي من الخادم"
+                            userNotification.value = Localization.Ui.text("update_success_count", language, "count" to result.importedCount.toString())
                         }
                         else -> Unit // Keep browsing on cached Room data; next tick retries.
                     }
@@ -457,11 +465,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     ?.substringAfterLast(":")
                                 oldKey != null && oldKey != req.status
                             }
-                            val title = if (isCraftsman && newlyOpened != null) "طلب خدمة جديد!" else "تحديث في طلباتك"
+                            val title = if (isCraftsman && newlyOpened != null) Localization.Ui.text("new_request_title", language) else Localization.Ui.text("status_change_title", language)
                             val body = when {
-                                isCraftsman && newlyOpened != null -> "لديك طلب خدمة جديد بانتظار ردك. افتح التطبيق للاطلاع على التفاصيل."
-                                !isCraftsman && statusChanged != null -> "حالة طلبك تغيّرت إلى: ${requestStatusName(statusChanged.status)}. افتح التطبيق للاطلاع."
-                                else -> "تحديث جديد على طلباتك. افتح التطبيق للاطلاع."
+                                isCraftsman && newlyOpened != null -> Localization.Ui.text("new_request_body", language)
+                                !isCraftsman && statusChanged != null -> Localization.Ui.text("status_change_body", language, "status" to when (statusChanged.status) { ServiceRequestEntity.STATUS_OPEN -> Localization.Ui.text("status_open", language); ServiceRequestEntity.STATUS_QUOTED -> Localization.Ui.text("status_quoted", language); ServiceRequestEntity.STATUS_ACCEPTED -> Localization.Ui.text("status_accepted", language); ServiceRequestEntity.STATUS_IN_PROGRESS -> Localization.Ui.text("status_in_progress", language); ServiceRequestEntity.STATUS_COMPLETED -> Localization.Ui.text("status_completed", language); ServiceRequestEntity.STATUS_CANCELLED -> Localization.Ui.text("status_cancelled", language); else -> statusChanged.status })
+                                else -> Localization.Ui.text("requests_update_body", language)
                             }
                             com.example.ui.notifications.RequestNotifier.notify(
                                 getApplication(),
@@ -473,21 +481,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
-                } catch (_: Throwable) {
+                                } catch (_: Throwable) {
                     // Swallow transient failures; the next tick will retry.
                 }
             }
         }
-    }
-
-    private fun requestStatusName(status: String): String = when (status) {
-        ServiceRequestEntity.STATUS_OPEN -> "جديد"
-        ServiceRequestEntity.STATUS_QUOTED -> "تسعير"
-        ServiceRequestEntity.STATUS_ACCEPTED -> "مقبول"
-        ServiceRequestEntity.STATUS_IN_PROGRESS -> "قيد التنفيذ"
-        ServiceRequestEntity.STATUS_COMPLETED -> "مكتمل"
-        ServiceRequestEntity.STATUS_CANCELLED -> "ملغي"
-        else -> status
     }
 
     fun updateDialogImageUrls(urls: List<String>) {
@@ -512,12 +510,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 description = description,
                 imageUrls = imageUrls
             )) {
-                is ServiceRequestResult.Success -> userNotification.value = "تم إرسال طلب الخدمة إلى الحرفي"
-                is ServiceRequestResult.SavedOffline -> userNotification.value = "تم حفظ الطلب محليًا وسيتم إرساله عند توفر الاتصال"
+                is ServiceRequestResult.Success -> userNotification.value = Localization.Ui.text("request_sent_ok", language)
+                is ServiceRequestResult.SavedOffline -> userNotification.value = Localization.Ui.text("request_saved_local", language)
                 is ServiceRequestResult.Error -> userNotification.value = when (result.message) {
-                    "auth_required" -> "يجب تسجيل الدخول لإرسال طلب خدمة"
-                    "description_invalid" -> "اكتب وصفًا بين 10 و2000 حرف"
-                    else -> "تعذر إنشاء طلب الخدمة"
+                    "auth_required" -> Localization.Ui.text("login_required", language)
+                    "description_invalid" -> Localization.Ui.text("description_hint", language)
+                    else -> Localization.Ui.text("error_auth_unknown", language)
                 }
             }
             showServiceRequestDialog.value = false
@@ -543,7 +541,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         syncOwnedCraftsmanAfterLogin(res.user.id)
                     }
                     showAuthDialog.value = false
-                    userNotification.value = "تم تسجيل الدخول بنجاح! مرحباً ${res.user.fullName}"
+                    userNotification.value = Localization.Ui.text("login_success", language, "name" to res.user.fullName)
                     if (pendingAuthAction == "RATE") {
                         showRatingDialog.value = true
                     } else if (pendingAuthAction == "REQUEST_SERVICE") {
@@ -578,7 +576,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 is com.example.data.AuthResult.Success -> {
                     currentUser.value = res.user
                     showAuthDialog.value = false
-                    userNotification.value = "تم إنشاء حساب الزبون بنجاح! مرحباً ${res.user.fullName}"
+                    userNotification.value = Localization.Ui.text("client_created_success", language, "name" to res.user.fullName)
                     if (pendingAuthAction == "RATE") {
                         showRatingDialog.value = true
                     } else if (pendingAuthAction == "REQUEST_SERVICE") {
@@ -649,9 +647,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     showAuthDialog.value = false
                     userNotification.value = if (syncResult is SyncResult.Failed) {
-                        "تم إنشاء الحساب وحفظ الملف محليًا، لكن تعذر رفعه للسحابة وسيعادَت المزامنة لاحقًا"
+                        Localization.Ui.text("profile_saved_local", language)
                     } else {
-                        "تم تسجيلك كحرفي بنجاح! ملفك الحرفي متاح في دليل Herafi DZ"
+                        Localization.Ui.text("craftsman_registered_success", language)
                     }
                     pendingAuthAction = null
                     onResult(null)
@@ -698,7 +696,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sync.restoreOwnedCraftsman(ownerId)
             }
             if (result is SyncResult.Failed) {
-                userNotification.value = "تعذر مزامنة ملفك الحرفي، يتم الاحتفاظ بالنسخة المحلية"
+                userNotification.value = Localization.Ui.text("profile_sync_failed", language)
             }
         }
     }
@@ -707,7 +705,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         userRepository.logoutUser()
         currentUser.value = null
         showSettingsDialog.value = false
-        userNotification.value = "تم تسجيل الخروج"
+        userNotification.value = Localization.Ui.text("logged_out", language)
     }
 
     // ------------------------------------------------------------------
@@ -737,9 +735,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             passwordUpdateResult.value = null
             val ok = runCatching { userRepository.changePassword(newPassword) }.getOrDefault(false)
             passwordUpdateResult.value = if (ok) {
-                "تم تغيير كلمة المرور بنجاح"
+                Localization.Ui.text("password_changed_ok", language)
             } else {
-                "تعذر تغيير كلمة المرور. تحقق من اتصالك بالإنترنت وحاول مرة أخرى"
+                Localization.Ui.text("password_changed_fail", language)
             }
             passwordUpdateInProgress.value = false
         }
@@ -778,7 +776,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val local = repository.getCraftsmanByOwnerId(uid) ?: run {
                 repository.registerNewCraftsman(
                     ownerId = uid,
-                    name = currentUser.value?.fullName ?: "حرفي",
+                    name = currentUser.value?.fullName ?: Localization.Ui.text("craftsman_word", language),
                     categoryKey = "BUILDER",
                     phone = currentUser.value?.phone ?: "",
                     whatsapp = "",
@@ -810,9 +808,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val syncResult = runCatching { api?.upsertOwnedCraftsman(profile = body) }
             if (syncResult.isFailure || syncResult.getOrNull() == null) {
-                userNotification.value = "تم تحديث التوفر محليًا؛ تعذر مزامنته مع الخادم"
+                userNotification.value = Localization.Ui.text("availability_local", language)
             } else {
-                userNotification.value = if (available) "أصبحت متاحًا لاستقبال الطلبات" else "أصبحت غير متاح مؤقتًا"
+                userNotification.value = if (available) Localization.Ui.text("now_available", language) else Localization.Ui.text("now_unavailable", language)
             }
         }
     }
@@ -832,7 +830,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val local = repository.getCraftsmanByOwnerId(uid) ?: run {
                 repository.registerNewCraftsman(
                     ownerId = uid,
-                    name = name.ifBlank { currentUser.value?.fullName ?: "حرفي" },
+                    name = name.ifBlank { currentUser.value?.fullName ?: Localization.Ui.text("craftsman_word", language) },
                     categoryKey = "BUILDER",
                     phone = phone,
                     whatsapp = "",
@@ -880,9 +878,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             val syncResult = runCatching { api?.upsertOwnedCraftsman(profile = body) }
             if (syncResult.isFailure || syncResult.getOrNull() == null) {
-                userNotification.value = "تم حفظ التعديلات محليًا؛ تعذر مزامنتها مع الخادم"
+                userNotification.value = Localization.Ui.text("profile_edits_local", language)
             } else {
-                userNotification.value = "تم تحديث ملفك الحرفي بنجاح"
+                userNotification.value = Localization.Ui.text("profile_updated_ok", language)
             }
         }
     }
@@ -915,7 +913,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 runCatching { api?.updateOwnedCraftsman(ownerId = "eq.$uid", body = pendingBody) }
             }
-            userNotification.value = "تم إعادة تعيين ملفك الحرفي إلى الحالة الأولية"
+            userNotification.value = Localization.Ui.text("profile_reset_ok", language)
             closeSettings()
         }
     }
@@ -934,7 +932,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Block self-review on the UI side as well (server trigger also enforces it)
             val selectedEntity = selectedCraftsman.value
             if (selectedEntity?.ownerId != null && selectedEntity.ownerId == currentUser.value?.id) {
-                userNotification.value = "لا يمكنك تقييم ملفك الخاص"
+                userNotification.value = Localization.Ui.text("cannot_rate_self", language)
                 showRatingDialog.value = false
                 return@launch
             }
@@ -951,7 +949,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 currentUserId = currentUser.value?.id
             )
             showRatingDialog.value = false
-            userNotification.value = "تمت إضافة تقييمك بنجاح! شكراً لك."
+            userNotification.value = Localization.Ui.text("rating_added_ok", language)
         }
     }
 
@@ -981,7 +979,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 skillsCsv = skillsCsv
             )
             filterState.value = filterState.value.copy(activeTab = MainTab.EXPLORE)
-            userNotification.value = "تم تسجيل الحرفي بنجاح وإضافته إلى الدليل!"
+            userNotification.value = Localization.Ui.text("worker_registered_ok", language)
         }
     }
 

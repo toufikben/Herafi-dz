@@ -241,7 +241,7 @@ fun CraftsmanCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (language == AppLanguage.AR) "جديد" else if (language == AppLanguage.FR) "Nouveau" else "New",
+                                    text = if (language == AppLanguage.AR) Localization.Ui.text("new_badge", language) else if (language == AppLanguage.FR) "Nouveau" else "New",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
@@ -251,7 +251,7 @@ fun CraftsmanCard(
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Text(
-                                text = if (language == AppLanguage.AR) "لم يقيّم بعد (كن أول من يقيّمه)" else if (language == AppLanguage.FR) "Pas encore évalué" else "Not rated yet",
+                                text = if (language == AppLanguage.AR) Localization.Ui.text("not_rated_yet", language) else if (language == AppLanguage.FR) "Pas encore évalué" else "Not rated yet",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF0D9488)
@@ -299,7 +299,7 @@ fun CraftsmanCard(
                                 )
                                 Text(
                                     text = "(${craftsman.ratingCount} ${
-                                        if (language == AppLanguage.AR) "تقييم" else if (language == AppLanguage.FR) "avis" else "reviews"
+                                        if (language == AppLanguage.AR) Localization.Ui.text("rating_word", language) else if (language == AppLanguage.FR) "avis" else "reviews"
                                     })",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -437,7 +437,7 @@ fun CraftsmanCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (language == AppLanguage.AR) "قيّم" else if (language == AppLanguage.FR) "Noter" else "Rate",
+                        text = if (language == AppLanguage.AR) Localization.Ui.text("rate_button", language) else if (language == AppLanguage.FR) "Noter" else "Rate",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = GoldAccent,

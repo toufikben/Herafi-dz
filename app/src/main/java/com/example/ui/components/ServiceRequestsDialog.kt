@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import com.example.data.db.ServiceRequestEntity
 import com.example.data.model.AppLanguage
+import com.example.ui.Localization
 
 @Composable
 fun ServiceRequestsDialog(
@@ -58,7 +59,7 @@ fun ServiceRequestsDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(if (language == AppLanguage.AR) "طلباتي" else if (language == AppLanguage.FR) "Mes demandes" else "My requests")
+                Text(if (language == AppLanguage.AR) Localization.Ui.text("my_requests_title", language) else if (language == AppLanguage.FR) "Mes demandes" else "My requests")
                 IconButton(onClick = onRefresh, modifier = Modifier.testTag("refresh_requests_button")) {
                     Icon(Icons.Default.Refresh, contentDescription = null)
                 }
@@ -68,7 +69,7 @@ fun ServiceRequestsDialog(
             Column {
                 if (pendingCount > 0) {
                     Text(
-                        text = if (language == AppLanguage.AR) "$pendingCount طلب بانتظار المزامنة" else if (language == AppLanguage.FR) "$pendingCount demande(s) en attente de synchronisation" else "$pendingCount request(s) pending sync",
+                        text = Localization.Ui.text("pending_sync_banner", language, "count" to pendingCount.toString()),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -76,7 +77,7 @@ fun ServiceRequestsDialog(
                 }
                 if (requests.isEmpty()) {
                     Text(
-                        text = if (language == AppLanguage.AR) "لا توجد طلبات بعد" else if (language == AppLanguage.FR) "Aucune demande" else "No requests yet",
+                        text = if (language == AppLanguage.AR) Localization.Ui.text("no_requests_yet", language) else if (language == AppLanguage.FR) "Aucune demande" else "No requests yet",
                         modifier = Modifier.padding(vertical = 24.dp)
                     )
                 } else {
@@ -90,7 +91,7 @@ fun ServiceRequestsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (language == AppLanguage.AR) "إغلاق" else if (language == AppLanguage.FR) "Fermer" else "Close")
+                Text(if (language == AppLanguage.AR) Localization.Ui.text("close_button", language) else if (language == AppLanguage.FR) "Fermer" else "Close")
             }
         }
     )
@@ -105,24 +106,24 @@ private fun RequestRow(
     onUpdateStatus: (remoteRequestId: String, newStatus: String) -> Unit
 ) {
     val status = when (request.status) {
-        ServiceRequestEntity.STATUS_OPEN -> if (language == AppLanguage.AR) "مفتوح" else if (language == AppLanguage.FR) "Ouverte" else "Open"
-        ServiceRequestEntity.STATUS_QUOTED -> if (language == AppLanguage.AR) "وصل عرض سعر" else if (language == AppLanguage.FR) "Devis reçu" else "Quoted"
-        ServiceRequestEntity.STATUS_ACCEPTED -> if (language == AppLanguage.AR) "مقبول" else if (language == AppLanguage.FR) "Acceptée" else "Accepted"
-        ServiceRequestEntity.STATUS_IN_PROGRESS -> if (language == AppLanguage.AR) "قيد التنفيذ" else if (language == AppLanguage.FR) "En cours" else "In progress"
-        ServiceRequestEntity.STATUS_COMPLETED -> if (language == AppLanguage.AR) "مكتمل" else if (language == AppLanguage.FR) "Terminée" else "Completed"
-        ServiceRequestEntity.STATUS_CANCELLED -> if (language == AppLanguage.AR) "ملغى" else if (language == AppLanguage.FR) "Annulée" else "Cancelled"
+        ServiceRequestEntity.STATUS_OPEN -> Localization.Ui.text("status_open", language)
+        ServiceRequestEntity.STATUS_QUOTED -> Localization.Ui.text("status_quoted", language)
+        ServiceRequestEntity.STATUS_ACCEPTED -> Localization.Ui.text("status_accepted", language)
+        ServiceRequestEntity.STATUS_IN_PROGRESS -> Localization.Ui.text("status_in_progress", language)
+        ServiceRequestEntity.STATUS_COMPLETED -> Localization.Ui.text("status_completed", language)
+        ServiceRequestEntity.STATUS_CANCELLED -> Localization.Ui.text("status_cancelled", language)
         else -> request.status
     }
     val syncText = when (request.syncState) {
         ServiceRequestEntity.SYNCED -> ""
-        ServiceRequestEntity.SYNC_FAILED -> if (language == AppLanguage.AR) "لم تتم المزامنة" else if (language == AppLanguage.FR) "Synchronisation échouée" else "Sync failed"
-        else -> if (language == AppLanguage.AR) "بانتظار المزامنة" else if (language == AppLanguage.FR) "En attente" else "Pending sync"
+        ServiceRequestEntity.SYNC_FAILED -> Localization.Ui.text("unsynced_label", language)
+        else -> Localization.Ui.text("waiting_sync_label", language)
     }
     val otherParty = when {
         isCraftsman && request.customerDisplayName != null ->
-            (if (language == AppLanguage.AR) "العميل: " else if (language == AppLanguage.FR) "Client: " else "Customer: ") + request.customerDisplayName
+            Localization.Ui.text("customer_label", language) + request.customerDisplayName
         !isCraftsman && request.craftsmanName != null ->
-            (if (language == AppLanguage.AR) "الحرفي: " else if (language == AppLanguage.FR) "Artisan: " else "Craftsman: ") + request.craftsmanName
+            Localization.Ui.text("craftsman_label", language) + request.craftsmanName
         else -> ""
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))) {
@@ -175,7 +176,7 @@ private fun RequestRow(
                         onClick = onRetry,
                         contentPadding = ButtonDefaults.ContentPadding,
                         modifier = Modifier.testTag("retry_request_button")
-                    ) { Text(if (language == AppLanguage.AR) "إعادة" else if (language == AppLanguage.FR) "Réessayer" else "Retry") }
+                    ) { Text(if (language == AppLanguage.AR) Localization.Ui.text("retry_button", language) else if (language == AppLanguage.FR) "Réessayer" else "Retry") }
                 }
                 if (isCraftsman && request.syncState == ServiceRequestEntity.SYNCED) {
                     Spacer(Modifier.weight(1f))
@@ -198,12 +199,12 @@ private fun craftsmanActions(
                 TextButton(
                     onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_QUOTED) }
                 ) {
-                    Text(if (language == AppLanguage.AR) "أرسل تسعير" else if (language == AppLanguage.FR) "Deviser" else "Quote")
+                    Text(if (language == AppLanguage.AR) Localization.Ui.text("send_quote_action", language) else if (language == AppLanguage.FR) "Deviser" else "Quote")
                 }
                 TextButton(
                     onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_CANCELLED) }
                 ) {
-                    Text(if (language == AppLanguage.AR) "رفض" else if (language == AppLanguage.FR) "Refuser" else "Decline")
+                    Text(if (language == AppLanguage.AR) Localization.Ui.text("reject_action", language) else if (language == AppLanguage.FR) "Refuser" else "Decline")
                 }
             }
         }
@@ -211,21 +212,21 @@ private fun craftsmanActions(
             TextButton(
                 onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_ACCEPTED) }
             ) {
-                Text(if (language == AppLanguage.AR) "تأكيد القبول" else if (language == AppLanguage.FR) "Confirmer" else "Confirm accept")
+                Text(if (language == AppLanguage.AR) Localization.Ui.text("confirm_accept_action", language) else if (language == AppLanguage.FR) "Confirmer" else "Confirm accept")
             }
         }
         ServiceRequestEntity.STATUS_ACCEPTED -> {
             TextButton(
                 onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_IN_PROGRESS) }
             ) {
-                Text(if (language == AppLanguage.AR) "بدء التنفيذ" else if (language == AppLanguage.FR) "Démarrer" else "Start work")
+                Text(if (language == AppLanguage.AR) Localization.Ui.text("start_work_action", language) else if (language == AppLanguage.FR) "Démarrer" else "Start work")
             }
         }
         ServiceRequestEntity.STATUS_IN_PROGRESS -> {
             TextButton(
                 onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_COMPLETED) }
             ) {
-                Text(if (language == AppLanguage.AR) "إكمال" else if (language == AppLanguage.FR) "Terminer" else "Complete")
+                Text(if (language == AppLanguage.AR) Localization.Ui.text("complete_work_action", language) else if (language == AppLanguage.FR) "Terminer" else "Complete")
             }
         }
     }

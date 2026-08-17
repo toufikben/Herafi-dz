@@ -89,6 +89,7 @@ fun AddWorkerScreen(
 
     var description by remember { mutableStateOf("") }
     var skillsCsv by remember { mutableStateOf("") }
+    var formError by remember { mutableStateOf<String?>(null) }
 
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     var wilayaDropdownExpanded by remember { mutableStateOf(false) }
@@ -112,8 +113,7 @@ fun AddWorkerScreen(
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = if (language == AppLanguage.AR) "أضف بياناتك كحرفي ليتمكن المواطنون في ولايتك من التواصل معك وتقييم عملك."
-                    else "Register as a craftsman to let clients in your Wilaya find and rate your work.",
+                    text = Localization.Ui.text("worker_intro_text", language),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
@@ -138,7 +138,7 @@ fun AddWorkerScreen(
 
         // Job Trade Dropdown
         Text(
-            text = if (language == AppLanguage.AR) "الحرفة والتخصص" else "Trade Specialty",
+            text = Localization.Ui.text("trade_specialty_label", language),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold
         )
@@ -226,7 +226,16 @@ fun AddWorkerScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        if (formError != null) {
+            Text(
+                text = formError!!,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
 
         // Wilaya Dropdown
         Text(
@@ -297,7 +306,7 @@ fun AddWorkerScreen(
             OutlinedTextField(
                 value = dailyRateStr,
                 onValueChange = { dailyRateStr = it },
-                label = { Text(if (language == AppLanguage.AR) "السعر اليومي (دج)" else "Daily Rate (DZD)") },
+                label = { Text(Localization.dailyRateLabel(language)) },
                 leadingIcon = { Icon(Icons.Default.Money, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -309,7 +318,7 @@ fun AddWorkerScreen(
             OutlinedTextField(
                 value = yearsExpStr,
                 onValueChange = { yearsExpStr = it },
-                label = { Text(if (language == AppLanguage.AR) "سنوات الخبرة" else "Years Exp") },
+                label = { Text(Localization.experienceLabel(language)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier
@@ -347,8 +356,11 @@ fun AddWorkerScreen(
 
         Button(
             onClick = {
-                if (name.isNotBlank() && phone.isNotBlank()) {
-                    onRegisterWorker(
+                formError = null
+                when {
+                    name.isBlank() -> formError = Localization.authErrorMessage(language, "error_name_empty")
+                    phone.isBlank() -> formError = Localization.Ui.text("phone_required_error", language)
+                    else -> onRegisterWorker(
                         name,
                         selectedCategory.key,
                         phone,

@@ -265,7 +265,7 @@ fun CraftsmanDetailSheet(
                                 }
                                 Text(
                                     text = "${Localization.scoreRatingText(language, craftsman.ratingScore)} • (${craftsman.ratingCount} ${
-                                        if (language == AppLanguage.AR) "تقييم" else "reviews"
+                                        if (language == AppLanguage.AR) Localization.Ui.text("review_count_word", language) else "reviews"
                                     })",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold
@@ -360,7 +360,7 @@ fun CraftsmanDetailSheet(
                     ) {
                         Text(
                             text = when (language) {
-                                AppLanguage.AR -> "طلب خدمة من هذا الحرفي"
+                                AppLanguage.AR -> Localization.Ui.text("request_service_button", language)
                                 AppLanguage.FR -> "Demander un service"
                                 AppLanguage.EN -> "Request a service"
                             },
@@ -372,7 +372,7 @@ fun CraftsmanDetailSheet(
 
                     // Description / About Section
                     Text(
-                        text = if (language == AppLanguage.AR) "عن الحرفي والخدمات" else "About & Services",
+                        text = if (language == AppLanguage.AR) Localization.Ui.text("about_header", language) else "About & Services",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -398,7 +398,7 @@ fun CraftsmanDetailSheet(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = if (language == AppLanguage.AR) "الأجر اليومي" else "Daily Rate",
+                                    text = if (language == AppLanguage.AR) Localization.Ui.text("daily_rate_header", language) else "Daily Rate",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -418,7 +418,7 @@ fun CraftsmanDetailSheet(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = if (language == AppLanguage.AR) "الخبرة الميدانية" else "Experience",
+                                    text = if (language == AppLanguage.AR) Localization.Ui.text("experience_header", language) else "Experience",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -436,7 +436,7 @@ fun CraftsmanDetailSheet(
                     // Skills Tags
                     if (craftsman.skillsCsv.isNotBlank()) {
                         Text(
-                            text = if (language == AppLanguage.AR) "التخصصات والمهارات" else "Specialties",
+                            text = if (language == AppLanguage.AR) Localization.Ui.text("skills_header", language) else "Specialties",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -496,7 +496,7 @@ fun CraftsmanDetailSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (language == AppLanguage.AR) "لا توجد تقييمات بعد. كن أول من يقيّم عمل هذا الحرفي!" else "No reviews yet. Be the first to rate!",
+                                text = if (language == AppLanguage.AR) Localization.Ui.text("no_reviews_placeholder", language) else "No reviews yet. Be the first to rate!",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -526,7 +526,7 @@ fun shareCraftsmanProfile(context: android.content.Context, craftsman: Craftsman
         append("Herafi DZ - ${craftsman.name}\n")
         append("$categoryName - $wilayaName (${craftsman.commune})\n")
         append("${craftsman.description}\n")
-        append("الهاتف: ${craftsman.phone}")
+        append(Localization.Ui.text("phone_label", language) + craftsman.phone)
     }
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "text/plain"
