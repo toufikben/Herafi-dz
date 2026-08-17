@@ -34,6 +34,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Generate debug keystore for release signing
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Debug, OU=Debug, O=HerafiDZ, L=Algiers, ST=Algiers, C=DZ"
+
       - name: Write Supabase secrets to .env
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
