@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -155,10 +156,18 @@ fun ServiceRequestDialog(
             uploading = true
             uploadError = null
             try {
+                // Upload each photo individually: succeeded URLs go into the
+                // request immediately; bytes that failed (offline, timeout, ...)
+                // are encoded as raw payloads so the repository can persist
+                // them locally and re-upload them once connectivity returns.
                 val newUrls = withContext(Dispatchers.IO) {
-                    pendingData.map { (bytes, fileName) -> storage.upload(bytes, fileName) }
+                    pendingData.map { (bytes, fileName) ->
+                        runCatching {
+                            storage.upload(bytes, fileName)
+                        }.getOrElse { "__pending__:${Base64.encodeToString(bytes, Base64.NO_WRAP)}" }
+                    }
                 }
-                uploadedUrls = newUrls
+                uploadedUrls = newUrls.filter { !it.startsWith("__pending__:") }
                 onSubmit(
                     craftsman.categoryKey,
                     craftsman.wilayaCode.toString(),
@@ -167,7 +176,7 @@ fun ServiceRequestDialog(
                     uploadedUrls
                 )
             } catch (_: Throwable) {
-                uploadError = if (language == AppLanguage.AR) "تعذر رفع الصور، أرسل الطلب بدونها" else "Failed to upload photos; request will be sent without them"
+                uploadError = if (language == AppLanguage.AR) "تعذر الاتصال؛ سترفع الصور تلقائيًا عند عودة الإنترنت" else "Could not connect; photos will upload automatically when internet returns"
                 // Even without photos, a description-only request still works.
                 onSubmit(
                     craftsman.categoryKey,

@@ -6,10 +6,13 @@ import com.example.data.db.ServiceRequestEntity
 import com.example.data.remote.CreateServiceRequestBody
 import com.example.data.remote.RemoteServiceRequest
 import com.example.data.remote.SupabaseApiProvider
+import com.example.data.remote.SupabaseStorage
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.Flow
+import java.io.File
+import android.util.Base64
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
@@ -26,6 +29,7 @@ class ServiceRequestRepository(
     context: Context
 ) {
     private val appContext = context.applicationContext
+    private val storage = SupabaseStorage(context)
 
     fun getForCurrentUser(): Flow<List<ServiceRequestEntity>> {
         val userId = userRepository.getCurrentUserId().orEmpty()
@@ -150,6 +154,7 @@ class ServiceRequestRepository(
             commune = commune,
             description = description,
             imageUrls = stringListToJson(image_urls),
+            pendingPhotoPaths = "[]",
             status = status,
             syncState = ServiceRequestEntity.SYNCED,
             createdAt = parseTimestamp(created_at) ?: System.currentTimeMillis(),
@@ -180,6 +185,7 @@ class ServiceRequestRepository(
             commune = commune,
             description = description,
             imageUrls = stringListToJson(image_urls),
+            pendingPhotoPaths = "[]",
             status = status,
             syncState = ServiceRequestEntity.SYNCED,
             createdAt = parseTimestamp(created_at) ?: existing?.createdAt ?: System.currentTimeMillis(),
@@ -222,6 +228,15 @@ class ServiceRequestRepository(
         var syncedCount = 0
         dao.getPendingForCustomer(customerId).forEach { localRequest ->
             runCatching {
+                // Re-upload photos that failed while offline before syncing the request.
+                val failedFiles = localRequest.pendingPhotoPathsList().map { File(it) }
+                val (newUrls, stillFailedFiles) = if (failedFiles.isNotEmpty()) {
+                    storage.uploadPendingFiles(failedFiles, localRequest.id)
+                } else emptyList<String>() to emptyList<File>()
+                val finalImageUrls = runCatching {
+                    val existing: List<String> = moshiStringList().fromJson(localRequest.imageUrls) ?: emptyList()
+                    (existing + newUrls).take(MAX_PHOTOS)
+                }.getOrDefault(emptyList())
                 val remote = api.createServiceRequest(
                     CreateServiceRequestBody(
                         client_request_id = localRequest.clientRequestId,
@@ -232,10 +247,7 @@ class ServiceRequestRepository(
                         commune = localRequest.commune,
                         description = localRequest.description,
                         status = localRequest.status,
-                        image_urls = runCatching {
-                            val list: List<String> = moshiStringList().fromJson(localRequest.imageUrls) ?: emptyList()
-                            list.take(MAX_PHOTOS)
-                        }.getOrNull()
+                        image_urls = finalImageUrls
                     )
                 ).firstOrNull() ?: error("empty_response")
                 dao.markSynced(
@@ -245,12 +257,31 @@ class ServiceRequestRepository(
                     syncState = ServiceRequestEntity.SYNCED,
                     updatedAt = System.currentTimeMillis()
                 )
+                if (stillFailedFiles.isNotEmpty()) {
+                    dao.updatePendingPhotoPaths(
+                        localRequest.id,
+                        moshiStringList().toJson(stillFailedFiles.map { it.absolutePath }),
+                        System.currentTimeMillis()
+                    )
+                }
                 syncedCount++
             }.onFailure {
                 dao.markSyncState(localRequest.id, ServiceRequestEntity.SYNC_FAILED, System.currentTimeMillis())
             }
         }
         return syncedCount
+    }
+
+    /** Persist raw photo bytes locally so they can be re-uploaded when connectivity returns. */
+    private fun saveFailedPhotosLocally(bytesList: List<ByteArray>): List<String> {
+        val paths = mutableListOf<String>()
+        for (bytes in bytesList) {
+            runCatching {
+                val file = SupabaseStorage.savePendingBytes(appContext, bytes, "photo.jpg")
+                paths += file.absolutePath
+            }
+        }
+        return paths
     }
 
     suspend fun createRequest(
@@ -269,6 +300,11 @@ class ServiceRequestRepository(
         }
 
         val localId = UUID.randomUUID().toString()
+        // Separate already-uploaded URLs from raw bytes that still need uploading
+        // (the UI sends raw compressed bytes when it could not upload them itself).
+        val uploadedUrls = imageUrls.filter { it.startsWith("http") }
+        val rawBytes = imageUrls.filter { it.startsWith("__pending__:") }
+            .map { Base64.decode(it.removePrefix("__pending__:"), Base64.DEFAULT) }
         val localRequest = ServiceRequestEntity(
             id = localId,
             clientRequestId = localId,
@@ -278,7 +314,8 @@ class ServiceRequestRepository(
             wilayaCode = wilayaCode.trim().take(10),
             commune = commune.trim().take(100),
             description = cleanDescription,
-            imageUrls = moshiStringList().toJson(imageUrls.take(MAX_PHOTOS)),
+            imageUrls = moshiStringList().toJson(uploadedUrls.take(MAX_PHOTOS)),
+            pendingPhotoPaths = moshiStringList().toJson(saveFailedPhotosLocally(rawBytes)),
             status = ServiceRequestEntity.STATUS_OPEN,
             syncState = ServiceRequestEntity.SYNC_PENDING
         )

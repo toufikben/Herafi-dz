@@ -390,6 +390,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     kotlinx.coroutines.delay(30_000L)
                     if (currentUser.value == null) continue
+                    // Offline-first: retry sending locally-persisted requests and
+                    // re-uploading their pending photos once connectivity returns.
+                    runCatching { serviceRequestRepository.syncPendingRequests() }
                     val savedUser = userRepository.getSavedUser()
                     val isCraftsman = savedUser?.userType.equals("CRAFTSMAN", ignoreCase = true)
                     val result = if (isCraftsman) {

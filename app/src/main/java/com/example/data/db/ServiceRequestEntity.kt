@@ -19,6 +19,7 @@ data class ServiceRequestEntity(
     val commune: String,
     val description: String,
     val imageUrls: String = "[]",
+    val pendingPhotoPaths: String = "[]",
     val status: String = STATUS_DRAFT,
     val syncState: String = SYNC_PENDING,
     val createdAt: Long = System.currentTimeMillis(),
@@ -32,13 +33,25 @@ data class ServiceRequestEntity(
     val craftsmanWilaya: String? = null,
     val isMine: Boolean = false
 ) {
-    fun imageUrlsList(): List<String> = runCatching {
-        val moshi = com.squareup.moshi.Moshi.Builder()
+    fun imageUrlsList(): List<String> = StringListCodec.stringListFromJson(imageUrls)
+
+    fun pendingPhotoPathsList(): List<String> = StringListCodec.stringListFromJson(pendingPhotoPaths)
+
+    object StringListCodec {
+        private val moshi = com.squareup.moshi.Moshi.Builder()
             .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
             .build()
-        val type = com.squareup.moshi.Types.newParameterizedType(List::class.java, String::class.java)
-        moshi.adapter<List<String>>(type).fromJson(imageUrls) ?: emptyList()
-    }.getOrDefault(emptyList())
+        private val type = com.squareup.moshi.Types.newParameterizedType(List::class.java, String::class.java)
+        private val adapter = moshi.adapter<List<String>>(type)
+
+        fun stringListFromJson(json: String?): List<String> = runCatching {
+            adapter.fromJson(json ?: "[]") ?: emptyList()
+        }.getOrDefault(emptyList())
+
+        fun stringListToJson(value: List<String>?): String = runCatching {
+            adapter.toJson(value ?: emptyList())
+        }.getOrDefault("[]")
+    }
 
     companion object {
         const val STATUS_DRAFT = "draft"

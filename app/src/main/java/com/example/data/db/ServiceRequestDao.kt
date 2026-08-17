@@ -43,4 +43,7 @@ interface ServiceRequestDao {
 
     @Query("DELETE FROM service_requests WHERE remoteId IS NOT NULL")
     suspend fun deleteRemoteRequests(): Int
+
+    @Query("UPDATE service_requests SET pendingPhotoPaths = :paths, updatedAt = :updatedAt WHERE id = :localId")
+    suspend fun updatePendingPhotoPaths(localId: String, paths: String, updatedAt: Long)
 }
