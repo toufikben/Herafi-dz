@@ -176,6 +176,33 @@ create policy "assigned craftsmen update requests" on public.service_requests
         exists (select 1 from public.craftsmen c where c.id = craftsman_id and c.owner_id = auth.uid())
     );
 
+create or replace function public.refresh_craftsman_rating(cid uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    update public.craftsmen set
+        rating_score = coalesce((select round(avg(score_ten)::numeric, 1) from public.reviews where craftsman_id = cid), 0),
+        rating_count = (select count(*)::int from public.reviews where craftsman_id = cid)
+    where id = cid;
+end;
+$$;
+
+create or replace function public.on_review_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+    if tg_op = 'delete' then
+        perform public.refresh_craftsman_rating(old.craftsman_id);
+    else
+        perform public.refresh_craftsman_rating(new.craftsman_id);
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists reviews_rating_refresh on public.reviews;
+create trigger reviews_rating_refresh
+    after insert or update or delete on public.reviews
+    for each row execute function public.on_review_change();
+
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
