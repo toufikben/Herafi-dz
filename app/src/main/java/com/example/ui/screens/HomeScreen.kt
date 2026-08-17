@@ -516,8 +516,9 @@ fun HomeScreen(
                         craftsman = selectedCraftsman!!,
                         language = language,
                         onDismiss = { viewModel.closeServiceRequestDialog() },
-                        onSubmit = { categoryKey, wilayaCode, commune, description ->
+                        onSubmit = { categoryKey, wilayaCode, commune, description, imageUrls ->
                             viewModel.submitServiceRequest(categoryKey, wilayaCode, commune, description)
+                            viewModel.updateDialogImageUrls(imageUrls)
                         }
                     )
                 }

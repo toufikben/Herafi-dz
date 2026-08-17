@@ -251,6 +251,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Show Service Request Dialog
     val showServiceRequestDialog = MutableStateFlow(false)
+    val dialogImageUrls = MutableStateFlow<List<String>>(emptyList())
 
     fun selectCategory(categoryKey: String) {
         resetCraftsmenPagination()
@@ -324,12 +325,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pendingAuthAction = "REQUEST_SERVICE"
             showAuthDialog.value = true
         } else {
+            dialogImageUrls.value = emptyList()
             showServiceRequestDialog.value = true
         }
     }
 
     fun closeServiceRequestDialog() {
         showServiceRequestDialog.value = false
+        dialogImageUrls.value = emptyList()
     }
 
     fun openServiceRequests() {
@@ -444,6 +447,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else -> status
     }
 
+    fun updateDialogImageUrls(urls: List<String>) {
+        dialogImageUrls.value = urls
+    }
+
     fun submitServiceRequest(
         categoryKey: String,
         wilayaCode: String,
@@ -451,13 +458,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         description: String
     ) {
         val craftsmanId = selectedCraftsmanId.value ?: return
+        val imageUrls = dialogImageUrls.value
+        dialogImageUrls.value = emptyList()
         viewModelScope.launch {
             when (val result = serviceRequestRepository.createRequest(
                 craftsmanId = craftsmanId,
                 categoryKey = categoryKey,
                 wilayaCode = wilayaCode,
                 commune = commune,
-                description = description
+                description = description,
+                imageUrls = imageUrls
             )) {
                 is ServiceRequestResult.Success -> userNotification.value = "تم إرسال طلب الخدمة إلى الحرفي"
                 is ServiceRequestResult.SavedOffline -> userNotification.value = "تم حفظ الطلب محليًا وسيتم إرساله عند توفر الاتصال"

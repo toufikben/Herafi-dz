@@ -6,6 +6,9 @@ import com.example.data.db.ServiceRequestEntity
 import com.example.data.remote.CreateServiceRequestBody
 import com.example.data.remote.RemoteServiceRequest
 import com.example.data.remote.SupabaseApiProvider
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -146,6 +149,7 @@ class ServiceRequestRepository(
             wilayaCode = wilaya_code,
             commune = commune,
             description = description,
+            imageUrls = stringListToJson(image_urls),
             status = status,
             syncState = ServiceRequestEntity.SYNCED,
             createdAt = parseTimestamp(created_at) ?: System.currentTimeMillis(),
@@ -175,6 +179,7 @@ class ServiceRequestRepository(
             wilayaCode = wilaya_code,
             commune = commune,
             description = description,
+            imageUrls = stringListToJson(image_urls),
             status = status,
             syncState = ServiceRequestEntity.SYNCED,
             createdAt = parseTimestamp(created_at) ?: existing?.createdAt ?: System.currentTimeMillis(),
@@ -226,7 +231,11 @@ class ServiceRequestRepository(
                         wilaya_code = localRequest.wilayaCode,
                         commune = localRequest.commune,
                         description = localRequest.description,
-                        status = localRequest.status
+                        status = localRequest.status,
+                        image_urls = runCatching {
+                            val list: List<String> = moshiStringList().fromJson(localRequest.imageUrls) ?: emptyList()
+                            list.take(MAX_PHOTOS)
+                        }.getOrNull()
                     )
                 ).firstOrNull() ?: error("empty_response")
                 dao.markSynced(
@@ -249,7 +258,8 @@ class ServiceRequestRepository(
         categoryKey: String,
         wilayaCode: String,
         commune: String,
-        description: String
+        description: String,
+        imageUrls: List<String> = emptyList()
     ): ServiceRequestResult {
         val customerId = userRepository.getCurrentUserId()
             ?: return ServiceRequestResult.Error("auth_required")
@@ -268,6 +278,7 @@ class ServiceRequestRepository(
             wilayaCode = wilayaCode.trim().take(10),
             commune = commune.trim().take(100),
             description = cleanDescription,
+            imageUrls = moshiStringList().toJson(imageUrls.take(MAX_PHOTOS)),
             status = ServiceRequestEntity.STATUS_OPEN,
             syncState = ServiceRequestEntity.SYNC_PENDING
         )
@@ -303,6 +314,18 @@ class ServiceRequestRepository(
             dao.markSyncState(localId, ServiceRequestEntity.SYNC_FAILED, System.currentTimeMillis())
             ServiceRequestResult.SavedOffline(localRequest.copy(syncState = ServiceRequestEntity.SYNC_FAILED))
         }
+    }
+
+    companion object {
+        const val MAX_PHOTOS = 3
+
+        private fun moshiStringList(): com.squareup.moshi.JsonAdapter<List<String>> {
+            val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+            return moshi.adapter<List<String>>(Types.newParameterizedType(List::class.java, String::class.java))
+        }
+
+        private fun stringListToJson(value: List<String>?): String =
+            runCatching { moshiStringList().toJson(value ?: emptyList()) }.getOrDefault("[]")
     }
 
     private fun String?.toRemoteCraftsmanId(): String? =

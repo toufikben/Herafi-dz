@@ -264,3 +264,60 @@ create trigger service_requests_immutable_guard
 -- revoke write access from anon role entirely (RLS policies are
 -- authenticated-only anyway; this removes any accidental anon write path)
 revoke update, insert, delete on public.service_requests from anon;
+
+-- ============================================================
+-- Level 3: Request photos (Supabase Storage)
+-- ============================================================
+-- Column for photo URLs on service_requests
+do $$
+begin
+    if not exists (select 1 from information_schema.columns where table_schema='public' and table_name='service_requests' and column_name='image_urls') then
+        alter table public.service_requests add column image_urls text[] not null default '{}';
+    end if;
+end $$;
+
+-- Storage bucket for request photos (public bucket, user-scoped paths)
+insert into storage.buckets (id, name, public)
+values ('request-photos', 'request-photos', true)
+on conflict (id) do update set public = true;
+
+-- Remove any permissive default policies created via the dashboard
+-- (Supabase creates open "users can upload/delete/update their own photos" policies by default)
+drop policy if exists "request photos are public" on storage.objects;
+drop policy if exists "users can delete their own photos" on storage.objects;
+drop policy if exists "users can update their own photos" on storage.objects;
+drop policy if exists "users can upload request photos" on storage.objects;
+drop policy if exists "request-photos-upload-own" on storage.objects;
+drop policy if exists "request-photos-manage-own" on storage.objects;
+drop policy if exists "request-photos-delete-own" on storage.objects;
+drop policy if exists "request-photos-select-public" on storage.objects;
+
+-- Authenticated users may upload and manage their own photos.
+create policy "request-photos-upload-own"
+    on storage.objects for insert
+    to authenticated
+    with check (
+        bucket_id = 'request-photos'
+        and (select first_dir from (select unnest(storage.foldername(objects.name)) as first_dir) _ limit 1) = auth.uid()::text
+    );
+
+create policy "request-photos-manage-own"
+    on storage.objects for update
+    to authenticated
+    using (
+        bucket_id = 'request-photos'
+        and (select first_dir from (select unnest(storage.foldername(objects.name)) as first_dir) _ limit 1) = auth.uid()::text
+    );
+
+create policy "request-photos-delete-own"
+    on storage.objects for delete
+    to authenticated
+    using (
+        bucket_id = 'request-photos'
+        and (select first_dir from (select unnest(storage.foldername(objects.name)) as first_dir) _ limit 1) = auth.uid()::text
+    );
+
+-- Anonymous/unauthenticated users can view all photos (public bucket).
+create policy "request-photos-select-public"
+    on storage.objects for select
+    using (bucket_id = 'request-photos');

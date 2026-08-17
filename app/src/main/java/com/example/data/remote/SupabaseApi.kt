@@ -93,7 +93,19 @@ interface SupabaseApi {
         @Query("id") requestId: String,
         @Body body: UpdateServiceRequestStatusBody
     ): List<RemoteServiceRequest>
+
+    @PATCH("rest/v1/service_requests")
+    @Headers("Content-Profile: public", "Prefer: return=representation")
+    suspend fun updateServiceRequestImages(
+        @Query("id") requestId: String,
+        @Body body: UpdateServiceRequestImagesBody
+    ): List<RemoteServiceRequest>
 }
+
+@JsonClass(generateAdapter = true)
+data class UpdateServiceRequestImagesBody(
+    val image_urls: List<String>
+)
 
 @JsonClass(generateAdapter = true)
 data class UpdateServiceRequestStatusBody(
@@ -171,7 +183,8 @@ data class CreateServiceRequestBody(
     val wilaya_code: String,
     val commune: String,
     val description: String,
-    val status: String = "open"
+    val status: String = "open",
+    val image_urls: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -187,6 +200,7 @@ data class RemoteServiceRequest(
     val status: String,
     val created_at: String? = null,
     val updated_at: String? = null,
+    val image_urls: List<String>? = null,
     val craftsmanPayload: EmbeddedCraftsman? = null,
     val craftsman_name: String? = null
 )

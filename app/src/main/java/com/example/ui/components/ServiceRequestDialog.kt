@@ -1,12 +1,30 @@
 package com.example.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,27 +32,96 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.db.CraftsmanEntity
 import com.example.data.model.AppLanguage
+import com.example.data.remote.SupabaseStorage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private const val MAX_PHOTOS = 3
+private const val MAX_PHOTO_BYTES: Long = 4L * 1024 * 1024
 
 @Composable
 fun ServiceRequestDialog(
     craftsman: CraftsmanEntity,
     language: AppLanguage,
     onDismiss: () -> Unit,
-    onSubmit: (categoryKey: String, wilayaCode: String, commune: String, description: String) -> Unit
+    onSubmit: (categoryKey: String, wilayaCode: String, commune: String, description: String, imageUrls: List<String>) -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var commune by remember { mutableStateOf(craftsman.commune) }
     var description by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    // Previews (URI) + ready-to-upload bytes indexed together.
+    var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var pendingData by remember { mutableStateOf<List<Pair<ByteArray, String>>>(emptyList()) }
+    // Already-uploaded public URLs.
+    var uploadedUrls by remember { mutableStateOf<List<String>>(emptyList()) }
+    val storage = remember { SupabaseStorage(context) }
 
     LaunchedEffect(description) {
         error = false
+    }
+
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = MAX_PHOTOS)
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                uris.take(MAX_PHOTOS).mapNotNull { uri ->
+                    runCatching {
+                        val size = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE)) else 0L
+                        } ?: 0L
+                        if (size > MAX_PHOTO_BYTES) return@mapNotNull null // Skip huge files early.
+                        val inputStream = context.contentResolver.openInputStream(uri) ?: return@mapNotNull null
+                        val original = BitmapFactory.decodeStream(inputStream)
+                        inputStream.close()
+                        original ?: return@mapNotNull null
+                        val resized = scaleToWidth(original, 800)
+                        if (resized !== original) original.recycle()
+                        val bytes = compressToJpeg(resized)
+                        resized.recycle()
+                        val ext = context.contentResolver.getType(uri)?.substringAfter('/') ?: "jpg"
+                        val sanitizedExt = if (ext == "jpeg" || ext == "jpg") "jpg" else if (ext == "png") "png" else "jpg"
+                        Pair(bytes, "${uri.lastPathSegment?.hashCode()?.toUInt()?.toString(16) ?: "p"}.${sanitizedExt}")
+                    }.getOrNull()
+                }
+            }
+            pendingUris = uris.take(MAX_PHOTOS).take(loaded.size)
+            pendingData = loaded
+            uploadError = null
+        }
+    }
+
+    val photoLabel = when (language) {
+        AppLanguage.AR -> "صور (${pendingData.size}/$MAX_PHOTOS)"
+        AppLanguage.FR -> "Photos (${pendingData.size}/$MAX_PHOTOS)"
+        AppLanguage.EN -> "Photos (${pendingData.size}/$MAX_PHOTOS)"
+    }
+    val addPhotoLabel = when (language) {
+        AppLanguage.AR -> "إضافة صور (اختياري، حتى 3)"
+        AppLanguage.FR -> "Ajouter des photos (facultatif, max 3)"
+        AppLanguage.EN -> "Add photos (optional, up to 3)"
     }
 
     val title = when (language) {
@@ -51,6 +138,48 @@ fun ServiceRequestDialog(
         AppLanguage.AR -> "إرسال الطلب"
         AppLanguage.FR -> "Envoyer la demande"
         AppLanguage.EN -> "Send request"
+    }
+    val uploadingLabel = when (language) {
+        AppLanguage.AR -> "جاري رفع الصور..."
+        AppLanguage.FR -> "Envoi des photos..."
+        AppLanguage.EN -> "Uploading photos..."
+    }
+
+    fun submitRequest() {
+        if (uploading) return
+        if (description.trim().length !in 10..2000) {
+            error = true
+            return
+        }
+        scope.launch {
+            uploading = true
+            uploadError = null
+            try {
+                val newUrls = withContext(Dispatchers.IO) {
+                    pendingData.map { (bytes, fileName) -> storage.upload(bytes, fileName) }
+                }
+                uploadedUrls = newUrls
+                onSubmit(
+                    craftsman.categoryKey,
+                    craftsman.wilayaCode.toString(),
+                    commune.trim(),
+                    description.trim(),
+                    uploadedUrls
+                )
+            } catch (_: Throwable) {
+                uploadError = if (language == AppLanguage.AR) "تعذر رفع الصور، أرسل الطلب بدونها" else "Failed to upload photos; request will be sent without them"
+                // Even without photos, a description-only request still works.
+                onSubmit(
+                    craftsman.categoryKey,
+                    craftsman.wilayaCode.toString(),
+                    commune.trim(),
+                    description.trim(),
+                    uploadedUrls
+                )
+            } finally {
+                uploading = false
+            }
+        }
     }
 
     AlertDialog(
@@ -81,23 +210,91 @@ fun ServiceRequestDialog(
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                        Spacer(Modifier.size(4.dp))
+                        Text(addPhotoLabel)
+                    }
+                    Text(
+                        text = photoLabel,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
+                }
+                if (pendingUris.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        pendingUris.forEachIndexed { index, uri ->
+                            Box {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(uri).crossfade(true).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                                IconButton(
+                                    onClick = {
+                                        pendingUris = pendingUris.toMutableList().apply { removeAt(index) }
+                                        pendingData = pendingData.toMutableList().apply { removeAt(index) }
+                                    },
+                                    modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (uploadError != null) {
+                    Text(
+                        text = uploadError!!,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if (description.trim().length !in 10..2000) {
-                    error = true
-                } else {
-                    onSubmit(craftsman.categoryKey, craftsman.wilayaCode.toString(), commune.trim(), description.trim())
+            if (uploading) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    Text(uploadingLabel)
                 }
-            }) {
-                Text(submitLabel)
+            } else {
+                Button(onClick = ::submitRequest) {
+                    Text(submitLabel)
+                }
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
+            Button(onClick = onDismiss, enabled = !uploading) {
                 Text(if (language == AppLanguage.AR) "إلغاء" else "Cancel")
             }
         }
     )
+}
+
+internal fun scaleToWidth(bitmap: Bitmap, maxPx: Int): Bitmap {
+    if (bitmap.width <= maxPx) return bitmap
+    val ratio = maxPx.toFloat() / bitmap.width
+    val height = (bitmap.height * ratio).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(bitmap, maxPx, height, true)
+}
+
+internal fun compressToJpeg(bitmap: Bitmap): ByteArray {
+    val output = java.io.ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, output)
+    return output.toByteArray()
 }

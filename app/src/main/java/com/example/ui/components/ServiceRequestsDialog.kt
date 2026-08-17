@@ -28,6 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import com.example.data.db.ServiceRequestEntity
 import com.example.data.model.AppLanguage
 
@@ -127,6 +135,33 @@ private fun RequestRow(
             }
             Spacer(Modifier.height(4.dp))
             Text(request.description, maxLines = 3, style = MaterialTheme.typography.bodySmall)
+            val images = request.imageUrlsList()
+            if (images.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    images.take(3).forEach { url ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(true).build(),
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                    if (images.size > 3) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("+${images.size - 3}", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(status, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
