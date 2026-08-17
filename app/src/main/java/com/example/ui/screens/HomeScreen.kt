@@ -96,7 +96,8 @@ import com.example.ui.theme.NavyPrimary
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    languageOverride: String = "ar"
 ) {
     val context = LocalContext.current
     val filterState by viewModel.filterState.collectAsStateWithLifecycle()
@@ -120,8 +121,10 @@ fun HomeScreen(
     val isCraftsmanAvailable by viewModel.isCraftsmanAvailable.collectAsStateWithLifecycle()
     val passwordUpdateInProgress by viewModel.passwordUpdateInProgress.collectAsStateWithLifecycle()
     val passwordUpdateResult by viewModel.passwordUpdateResult.collectAsStateWithLifecycle()
+    val settingsThemeMode by viewModel.settingsThemeMode.collectAsStateWithLifecycle()
+    val settingsSelectedLanguage by viewModel.settingsSelectedLanguage.collectAsStateWithLifecycle()
 
-    val language = filterState.selectedLanguage
+    val language = AppLanguage.entries.firstOrNull { it.code == languageOverride } ?: filterState.selectedLanguage
     val layoutDirection = if (language.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     val craftsmanListState = rememberLazyListState()
 
@@ -597,7 +600,11 @@ fun HomeScreen(
                         onToggleRequestNotifications = { enabled -> viewModel.toggleRequestNotifications(enabled) },
                         onToggleCraftsmanAvailability = { available -> viewModel.toggleCraftsmanAvailability(available) },
                         onToggleCraftsmanNotifications = { enabled -> viewModel.toggleCraftsmanNotifications(enabled) },
-                        onUpdateNotificationInterval = { seconds -> viewModel.updateNotificationInterval(seconds) }
+                        onUpdateNotificationInterval = { seconds -> viewModel.updateNotificationInterval(seconds) },
+                        themeMode = settingsThemeMode,
+                        selectedLanguage = settingsSelectedLanguage,
+                        onThemeModeChange = { mode -> viewModel.setThemeMode(mode) },
+                        onLanguageChange = { code -> viewModel.setLanguage(code) }
                     )
                 }
 

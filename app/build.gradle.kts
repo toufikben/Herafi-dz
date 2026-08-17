@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.algeriacraftsmen.dzmprq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 14
-    versionName = "1.5.0"
+    versionCode = 15
+    versionName = "1.6.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -87,7 +87,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.security.crypto)
-  // implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)

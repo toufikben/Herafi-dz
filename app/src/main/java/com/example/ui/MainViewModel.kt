@@ -14,6 +14,7 @@ import com.example.data.remote.SupabaseApiProvider
 import com.example.data.remote.SupabaseCraftsmanSync
 import com.example.data.remote.SyncResult
 import com.example.data.model.AppLanguage
+import com.example.data.prefs.AppPreferencesManager
 import com.example.data.model.SortOption
 import com.example.data.model.TradeCategories
 import com.example.data.model.TradeCategory
@@ -63,6 +64,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isCraftsmanAvailable = MutableStateFlow(true)
     val passwordUpdateInProgress = MutableStateFlow(false)
     val passwordUpdateResult = MutableStateFlow<String?>(null) // null | success message | error message
+    val settingsThemeMode = MutableStateFlow("system") // system | light | dark
+    val settingsSelectedLanguage = MutableStateFlow("ar")
     val serviceRequests = MutableStateFlow<List<ServiceRequestEntity>>(emptyList())
     val userNotification = MutableStateFlow<String?>(null)
     var pendingAuthAction: String? = null // "RATE", "REQUEST_SERVICE", "REQUESTS" or "ACCOUNT"
@@ -752,6 +755,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateNotificationInterval(seconds: Int) {
         notificationIntervalSeconds.value = seconds
+    }
+    fun setThemeMode(mode: String) {
+        settingsThemeMode.value = mode
+        viewModelScope.launch {
+            AppPreferencesManager.setThemeMode(getApplication<Application>(), AppPreferencesManager.ThemeMode.from(mode))
+        }
+    }
+    fun setLanguage(code: String) {
+        settingsSelectedLanguage.value = code
+        viewModelScope.launch {
+            // Persisting updates the DataStore flow observed by MainActivity,
+            // which applies the language to the configuration immediately.
+            AppPreferencesManager.setLanguage(getApplication<Application>(), code)
+        }
     }
 
     fun toggleCraftsmanAvailability(available: Boolean) {

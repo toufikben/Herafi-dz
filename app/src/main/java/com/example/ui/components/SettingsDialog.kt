@@ -85,7 +85,11 @@ fun SettingsDialog(
     onToggleRequestNotifications: (Boolean) -> Unit,
     onToggleCraftsmanAvailability: (Boolean) -> Unit,
     onToggleCraftsmanNotifications: (Boolean) -> Unit,
-    onUpdateNotificationInterval: (Int) -> Unit
+    onUpdateNotificationInterval: (Int) -> Unit,
+    themeMode: String = "system",
+    selectedLanguage: String = "ar",
+    onThemeModeChange: (String) -> Unit = {},
+    onLanguageChange: (String) -> Unit = {}
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -100,6 +104,14 @@ fun SettingsDialog(
         text = {
             Box(modifier = Modifier.height(520.dp)) {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    AppearanceSection(
+                        themeMode = themeMode,
+                        selectedLanguage = selectedLanguage,
+                        language = language,
+                        onThemeModeChange = onThemeModeChange,
+                        onLanguageChange = onLanguageChange
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     if (currentUser != null) {
                         AccountSection(
                             currentUser = currentUser,
@@ -485,10 +497,112 @@ private fun CraftsmanSection(
             contentColor = MaterialTheme.colorScheme.error
         )
     ) {
-        Icon(Icons.Default.DeleteForever, contentDescription = null)
+                Icon(Icons.Default.DeleteForever, contentDescription = null)
         Spacer(modifier = Modifier.width(6.dp))
         Text("حذف ملف الحرفي (إعادة التعيين)")
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearanceSection(
+    themeMode: String,
+    selectedLanguage: String,
+    language: AppLanguage,
+    onThemeModeChange: (String) -> Unit,
+    onLanguageChange: (String) -> Unit
+) {
+    var themeExpanded by remember { mutableStateOf(false) }
+    var langExpanded by remember { mutableStateOf(false) }
+    val themes = listOf("system", "light", "dark")
+    val langs = listOf("ar", "fr", "en")
+
+    SectionHeader(icon = Icons.Default.Edit, title = "المظهر واللغة")
+
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "المظهر:",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        ExposedDropdownMenuBox(
+            expanded = themeExpanded,
+            onExpandedChange = { themeExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            TextField(
+                value = when (themeMode) {
+                    "light" -> "فاتح"
+                    "dark" -> "داكن"
+                    else -> "اتبع النظام"
+                },
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier.menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+            ExposedDropdownMenu(
+                expanded = themeExpanded,
+                onDismissRequest = { themeExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("اتبع النظام") },
+                    onClick = { onThemeModeChange("system"); themeExpanded = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("فاتح") },
+                    onClick = { onThemeModeChange("light"); themeExpanded = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("داكن") },
+                    onClick = { onThemeModeChange("dark"); themeExpanded = false }
+                )
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "اللغة:",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        ExposedDropdownMenuBox(
+            expanded = langExpanded,
+            onExpandedChange = { langExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            TextField(
+                value = langs.firstOrNull { it == selectedLanguage }?.let { AppLanguage.entries.firstOrNull { l -> l.code == it }?.nativeName } ?: language.nativeName,
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier.menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
+                colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                textStyle = MaterialTheme.typography.bodyMedium
+            )
+            ExposedDropdownMenu(
+                expanded = langExpanded,
+                onDismissRequest = { langExpanded = false }
+            ) {
+                langs.forEach { code ->
+                    val lang = AppLanguage.entries.firstOrNull { it.code == code }
+                    DropdownMenuItem(
+                        text = { Text(lang?.nativeName ?: code) },
+                        onClick = { onLanguageChange(code); langExpanded = false }
+                    )
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "تغيير اللغة قد يتطلب إعادة تشغيل التطبيق لبعض الشاشات.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable
