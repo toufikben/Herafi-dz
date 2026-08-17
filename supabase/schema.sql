@@ -217,3 +217,50 @@ drop trigger if exists craftsmen_updated_at on public.craftsmen;
 create trigger craftsmen_updated_at before update on public.craftsmen for each row execute function public.set_updated_at();
 drop trigger if exists requests_updated_at on public.service_requests;
 create trigger requests_updated_at before update on public.service_requests for each row execute function public.set_updated_at();
+
+-- ============================================================================
+-- security hardening (v1.2.0): protect service_requests critical fields
+-- ============================================================================
+
+-- trigger: only the assigned craftsman may change status / craftsman_id;
+-- customer_id can never be changed after creation.
+create or replace function public.service_requests_immutable_guard()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+    -- customer_id is immutable
+    if new.customer_id is distinct from old.customer_id then
+        raise exception 'customer_id cannot be changed';
+    end if;
+
+    -- only the assigned craftsman may touch status / craftsman_id
+    if (select exists (
+            select 1 from public.craftsmen c
+            where c.id = old.craftsman_id and c.owner_id = auth.uid()
+       )) then
+        if new.craftsman_id is distinct from old.craftsman_id then
+            raise exception 'assigned craftsman may not change craftsman_id';
+        end if;
+    else
+        if new.status is distinct from old.status then
+            raise exception 'status may only be changed by the assigned craftsman';
+        end if;
+        if new.craftsman_id is distinct from old.craftsman_id then
+            raise exception 'craftsman_id may only be changed by assignment at creation';
+        end if;
+    end if;
+
+    return new;
+end;
+$$;
+
+drop trigger if exists service_requests_immutable_guard on public.service_requests;
+create trigger service_requests_immutable_guard
+    before update on public.service_requests
+    for each row execute function public.service_requests_immutable_guard();
+
+-- revoke write access from anon role entirely (RLS policies are
+-- authenticated-only anyway; this removes any accidental anon write path)
+revoke update, insert, delete on public.service_requests from anon;

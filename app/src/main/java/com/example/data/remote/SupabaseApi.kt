@@ -12,6 +12,7 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -59,6 +60,21 @@ interface SupabaseApi {
 
     @GET("rest/v1/service_requests")
     @Headers("Accept-Profile: public")
+    suspend fun getServiceRequestsForCraftsman(
+        @Query("craftsmen.owner_id") ownerFilter: String,
+        @Query("select") select: String = "*,craftsmen!inner(id,name,phone,category_key,wilaya_code,commune,rating_score)",
+        @Query("order") order: String = "created_at.desc"
+    ): List<RemoteServiceRequest>
+
+    @GET("rest/v1/profiles")
+    @Headers("Accept-Profile: public")
+    suspend fun getProfiles(
+        @Query("id") id: String,
+        @Query("select") select: String = "*"
+    ): List<RemoteProfile>
+
+    @GET("rest/v1/service_requests")
+    @Headers("Accept-Profile: public")
     suspend fun getServiceRequestsForCustomer(
         @Query("customer_id") customerId: String,
         @Query("select") select: String = "*",
@@ -70,7 +86,19 @@ interface SupabaseApi {
     suspend fun createServiceRequest(
         @Body request: CreateServiceRequestBody
     ): List<RemoteServiceRequest>
+
+    @PATCH("rest/v1/service_requests")
+    @Headers("Content-Profile: public", "Prefer: return=representation")
+    suspend fun updateServiceRequestStatus(
+        @Query("id") requestId: String,
+        @Body body: UpdateServiceRequestStatusBody
+    ): List<RemoteServiceRequest>
 }
+
+@JsonClass(generateAdapter = true)
+data class UpdateServiceRequestStatusBody(
+    val status: String
+)
 
 @JsonClass(generateAdapter = true)
 data class RemoteCraftsman(
@@ -158,7 +186,20 @@ data class RemoteServiceRequest(
     val description: String,
     val status: String,
     val created_at: String? = null,
-    val updated_at: String? = null
+    val updated_at: String? = null,
+    val craftsmanPayload: EmbeddedCraftsman? = null,
+    val craftsman_name: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class EmbeddedCraftsman(
+    val id: String,
+    val name: String,
+    val phone: String,
+    val category_key: String,
+    val wilaya_code: String,
+    val commune: String,
+    val rating_score: Double
 )
 
 private class SupabaseHeadersInterceptor(

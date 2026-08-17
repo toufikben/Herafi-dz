@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CraftsmanEntity::class, ReviewEntity::class, BookmarkEntity::class, UserEntity::class, ServiceRequestEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +40,19 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS service_requests_customer_idx ON service_requests(customerId, createdAt)")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN customerDisplayName TEXT")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN craftsmanName TEXT")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN craftsmanPhone TEXT")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN craftsmanRating REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN craftsmanCategory TEXT")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN craftsmanWilaya TEXT")
+                db.execSQL("ALTER TABLE service_requests ADD COLUMN isMine INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS service_requests_craftsman_idx ON service_requests(craftsmanId, createdAt)")
             }
         }
 
@@ -93,7 +106,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "herafi_dz_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance

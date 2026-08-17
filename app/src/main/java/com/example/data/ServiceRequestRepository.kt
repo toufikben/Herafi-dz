@@ -29,6 +29,174 @@ class ServiceRequestRepository(
         return dao.getForCustomer(userId)
     }
 
+    suspend fun getAssignedRequests(): List<ServiceRequestEntity> {
+        // Fetch all requests assigned to any craftsman profile the current owner has.
+        val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+        val profiles = api?.let {
+            runCatching {
+                it.getCraftsmanForOwner(
+                    ownerId = "eq.${userRepository.getCurrentUserId().orEmpty()}",
+                    select = "id",
+                    limit = 10
+                )
+            }.getOrDefault(emptyList())
+        }.orEmpty()
+        val ownedIds = profiles.map { it.id }
+        if (ownedIds.isEmpty()) return emptyList()
+        var merged = emptyList<ServiceRequestEntity>()
+        ownedIds.forEach { cid ->
+            var items: List<ServiceRequestEntity>? = null
+            dao.getForCraftsman(cid).collect { items = it }
+            merged = mergeRequests(merged, items ?: emptyList())
+        }
+        return merged.sortedByDescending { it.createdAt }
+    }
+
+    suspend fun updateRequestStatusForCraftsman(
+        remoteRequestId: String,
+        newStatus: String
+    ): Result<Unit> {
+        val userId = userRepository.getCurrentUserId()
+            ?: return Result.failure(IllegalStateException("auth_required"))
+        val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            ?: return Result.failure(IllegalStateException("not_configured"))
+        return runCatching {
+            val updated = api.updateServiceRequestStatus(
+                requestId = "eq.$remoteRequestId",
+                body = com.example.data.remote.UpdateServiceRequestStatusBody(newStatus)
+            ).firstOrNull() ?: error("empty_response")
+            // Reflect the new status locally immediately, before the next polling tick.
+            dao.findById("remote_$remoteRequestId")?.let { local ->
+                dao.markSyncState(local.id, ServiceRequestEntity.SYNCED, System.currentTimeMillis())
+                dao.setStatus(remoteRequestId, newStatus)
+            }
+            Unit
+        }
+    }
+
+    suspend fun refreshForCraftsmanDirect(): Result<Int> {
+        val ownerId = userRepository.getCurrentUserId()
+            ?: return Result.failure(IllegalStateException("auth_required"))
+        val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            ?: return Result.failure(IllegalStateException("not_configured"))
+        return runCatching {
+            val remoteRequests = api.getServiceRequestsForCraftsman(ownerFilter = "eq.$ownerId")
+            dao.deleteRemoteRequests()
+            dao.insertAll(remoteRequests.map { remote ->
+                remote.toCraftsmanEntity(remote.craftsman_name)
+            })
+            // Requests assigned to any craftsman profile this user owns are managed
+            // by this user, so surface them as own requests in the local list.
+            remoteRequests.forEach { remote ->
+                dao.markAsMine(remote.id)
+            }
+            remoteRequests.size
+        }
+    }
+
+    private suspend fun mergeRequests(
+        existing: List<ServiceRequestEntity>,
+        incoming: List<ServiceRequestEntity>
+    ): List<ServiceRequestEntity> {
+        val map = existing.associateBy { it.remoteId ?: it.id }
+        val merged = ArrayList<ServiceRequestEntity>(existing)
+        incoming.forEach { incomingRequest ->
+            val key = incomingRequest.remoteId ?: incomingRequest.id
+            if (map.containsKey(key)) {
+                merged.replaceAll { if ((it.remoteId ?: it.id) == key) incomingRequest else it }
+            } else {
+                merged.add(incomingRequest)
+            }
+        }
+        return merged
+    }
+
+    private suspend fun refreshForCraftsman(
+        ownerId: String,
+        api: com.example.data.remote.SupabaseApi
+    ): Result<Int> {
+        return runCatching {
+            // Find the craftsman profile this owner published (RLS allows owners to see theirs).
+            val profile = api.getCraftsmanForOwner(
+                ownerId = "eq.$ownerId",
+                select = "id",
+                limit = 1
+            ).firstOrNull() ?: return@runCatching 0
+            val remoteRequests = api.getServiceRequestsForCraftsman(ownerFilter = "eq.$ownerId")
+            dao.deleteRemoteRequests()
+            dao.insertAll(remoteRequests.map { remote ->
+                remote.toCraftsmanEntity(remote.craftsman_name)
+            })
+            remoteRequests.size
+        }
+    }
+
+    private fun com.example.data.remote.RemoteServiceRequest.toCraftsmanEntity(
+        craftsmanName: String?
+    ): ServiceRequestEntity {
+        // Extract the embedded craftsman details from the JSON join payload.
+        val craft = craftsmanPayload
+        return ServiceRequestEntity(
+            id = "remote_$id",
+            clientRequestId = client_request_id ?: id,
+            remoteId = id,
+            customerId = customer_id,
+            craftsmanId = craftsman_id,
+            categoryKey = category_key,
+            wilayaCode = wilaya_code,
+            commune = commune,
+            description = description,
+            status = status,
+            syncState = ServiceRequestEntity.SYNCED,
+            createdAt = parseTimestamp(created_at) ?: System.currentTimeMillis(),
+            updatedAt = parseTimestamp(updated_at) ?: System.currentTimeMillis(),
+            craftsmanName = craft?.name ?: craftsmanName,
+            craftsmanPhone = craft?.phone,
+            craftsmanRating = craft?.rating_score ?: 0.0,
+            craftsmanCategory = craft?.category_key,
+            craftsmanWilaya = craft?.wilaya_code,
+            isMine = false
+        )
+    }
+
+    private fun com.example.data.remote.RemoteServiceRequest.toEntity(
+        customerId: String,
+        dao: ServiceRequestDao,
+        customerDisplayName: String? = null
+    ): ServiceRequestEntity {
+        val existing = dao.findByRemoteId(id)
+        return ServiceRequestEntity(
+            id = existing?.id ?: "remote_$id",
+            clientRequestId = existing?.clientRequestId ?: client_request_id ?: id,
+            remoteId = id,
+            customerId = customerId,
+            craftsmanId = craftsman_id,
+            categoryKey = category_key,
+            wilayaCode = wilaya_code,
+            commune = commune,
+            description = description,
+            status = status,
+            syncState = ServiceRequestEntity.SYNCED,
+            createdAt = parseTimestamp(created_at) ?: existing?.createdAt ?: System.currentTimeMillis(),
+            updatedAt = parseTimestamp(updated_at) ?: existing?.updatedAt ?: System.currentTimeMillis(),
+            customerDisplayName = customerDisplayName,
+            isMine = true
+        )
+    }
+
+    private suspend fun fetchCustomerDisplayNames(
+        api: com.example.data.remote.SupabaseApi,
+        customerIds: List<String>
+    ): Map<String, String> {
+        if (customerIds.isEmpty()) return emptyMap()
+        return runCatching {
+            api.getProfiles(
+                id = "in.(${customerIds.joinToString(",") { "\"$it\"" }})",
+                select = "id,display_name"
+            ).associate { it.id to (it.display_name ?: it.id) }
+        }.getOrDefault(emptyMap())
+    }
+
     suspend fun refreshCurrentUserRequests(): Result<Int> {
         val customerId = userRepository.getCurrentUserId()
             ?: return Result.failure(IllegalStateException("auth_required"))
@@ -37,7 +205,8 @@ class ServiceRequestRepository(
 
         return runCatching {
             val remoteRequests = api.getServiceRequestsForCustomer(customerId)
-            dao.insertAll(remoteRequests.map { remote -> remote.toEntity(customerId, dao) })
+            val customerNames = fetchCustomerDisplayNames(api, remoteRequests.mapNotNull { it.customer_id.takeIf { it.isNotBlank() } }.distinct())
+            dao.insertAll(remoteRequests.map { remote -> remote.toEntity(customerId, dao, customerNames[remote.customer_id]) })
             remoteRequests.size
         }
     }
@@ -134,28 +303,6 @@ class ServiceRequestRepository(
             dao.markSyncState(localId, ServiceRequestEntity.SYNC_FAILED, System.currentTimeMillis())
             ServiceRequestResult.SavedOffline(localRequest.copy(syncState = ServiceRequestEntity.SYNC_FAILED))
         }
-    }
-
-    private suspend fun RemoteServiceRequest.toEntity(
-        customerId: String,
-        dao: ServiceRequestDao
-    ): ServiceRequestEntity {
-        val existing = dao.findByRemoteId(id)
-        return ServiceRequestEntity(
-            id = existing?.id ?: "remote_$id",
-            clientRequestId = existing?.clientRequestId ?: client_request_id ?: id,
-            remoteId = id,
-            customerId = customerId,
-            craftsmanId = craftsman_id,
-            categoryKey = category_key,
-            wilayaCode = wilaya_code,
-            commune = commune,
-            description = description,
-            status = status,
-            syncState = ServiceRequestEntity.SYNCED,
-            createdAt = parseTimestamp(created_at) ?: existing?.createdAt ?: System.currentTimeMillis(),
-            updatedAt = parseTimestamp(updated_at) ?: existing?.updatedAt ?: System.currentTimeMillis()
-        )
     }
 
     private fun String?.toRemoteCraftsmanId(): String? =

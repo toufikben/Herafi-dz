@@ -72,6 +72,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentUser.value = userRepository.getSavedUser()
         }
 
+        // Start live request updates once the user is signed in.
+        viewModelScope.launch {
+            currentUser.collect { user ->
+                if (user != null) startLiveRequestUpdates()
+            }
+        }
+
         // Remote data is optional during migration. Room remains the immediate source of UI data.
         viewModelScope.launch {
             when (val result = SupabaseCraftsmanSync(
@@ -354,6 +361,87 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun retryPendingServiceRequests() {
         refreshServiceRequests()
+    }
+
+    fun updateServiceRequestStatus(remoteRequestId: String, newStatus: String) {
+        viewModelScope.launch {
+            val result = serviceRequestRepository.updateRequestStatusForCraftsman(remoteRequestId, newStatus)
+            if (result.isSuccess) {
+                userNotification.value = "تم تحديث حالة الطلب"
+                refreshServiceRequests()
+            } else {
+                userNotification.value = "تعذر تحديث حالة الطلب"
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Live request polling: periodically refreshes the current user's
+    // requests (customer or craftsman role) and shows a system notification
+    // when a new request arrives or a status changes.
+    // ------------------------------------------------------------------
+    fun startLiveRequestUpdates() {
+        viewModelScope.launch {
+            var lastSnapshot = emptySet<String>()
+            while (true) {
+                try {
+                    kotlinx.coroutines.delay(30_000L)
+                    if (currentUser.value == null) continue
+                    val savedUser = userRepository.getSavedUser()
+                    val isCraftsman = savedUser?.userType.equals("CRAFTSMAN", ignoreCase = true)
+                    val result = if (isCraftsman) {
+                        serviceRequestRepository.refreshForCraftsmanDirect()
+                    } else {
+                        serviceRequestRepository.refreshCurrentUserRequests()
+                    }
+                    if (result.isSuccess) {
+                        val requests = if (isCraftsman) {
+                            serviceRequestRepository.getAssignedRequests()
+                        } else {
+                            serviceRequestRepository.getForCurrentUser().first()
+                        }
+                        serviceRequests.value = requests
+                        val snapshot = requests
+                            .map { "${it.remoteId ?: it.id}:${it.status}" }
+                            .toSet()
+                        if (lastSnapshot.isNotEmpty() && snapshot != lastSnapshot) {
+                            val newlyOpened = requests.firstOrNull { it.status == ServiceRequestEntity.STATUS_OPEN }
+                            val statusChanged = requests.firstOrNull { req ->
+                                val oldKey = lastSnapshot.firstOrNull { s -> s.startsWith("${req.remoteId ?: req.id}:") }
+                                    ?.substringAfterLast(":")
+                                oldKey != null && oldKey != req.status
+                            }
+                            val title = if (isCraftsman && newlyOpened != null) "طلب خدمة جديد!" else "تحديث في طلباتك"
+                            val body = when {
+                                isCraftsman && newlyOpened != null -> "لديك طلب خدمة جديد بانتظار ردك. افتح التطبيق للاطلاع على التفاصيل."
+                                !isCraftsman && statusChanged != null -> "حالة طلبك تغيّرت إلى: ${requestStatusName(statusChanged.status)}. افتح التطبيق للاطلاع."
+                                else -> "تحديث جديد على طلباتك. افتح التطبيق للاطلاع."
+                            }
+                            com.example.ui.notifications.RequestNotifier.notify(
+                                getApplication(),
+                                title = title,
+                                body = body
+                            )
+                        }
+                        lastSnapshot = snapshot
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // Swallow transient failures; the next tick will retry.
+                }
+            }
+        }
+    }
+
+    private fun requestStatusName(status: String): String = when (status) {
+        ServiceRequestEntity.STATUS_OPEN -> "جديد"
+        ServiceRequestEntity.STATUS_QUOTED -> "تسعير"
+        ServiceRequestEntity.STATUS_ACCEPTED -> "مقبول"
+        ServiceRequestEntity.STATUS_IN_PROGRESS -> "قيد التنفيذ"
+        ServiceRequestEntity.STATUS_COMPLETED -> "مكتمل"
+        ServiceRequestEntity.STATUS_CANCELLED -> "ملغي"
+        else -> status
     }
 
     fun submitServiceRequest(

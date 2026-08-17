@@ -551,7 +551,11 @@ fun HomeScreen(
                         language = language,
                         onDismiss = { viewModel.closeServiceRequests() },
                         onRefresh = { viewModel.refreshServiceRequests() },
-                        onRetry = { viewModel.retryPendingServiceRequests() }
+                        onRetry = { viewModel.retryPendingServiceRequests() },
+                        isCraftsman = currentUser?.userType == "craftsman",
+                        onUpdateStatus = { remoteRequestId, newStatus ->
+                            viewModel.updateServiceRequestStatus(remoteRequestId, newStatus)
+                        }
                     )
                 }
 

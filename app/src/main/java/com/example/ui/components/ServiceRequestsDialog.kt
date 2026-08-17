@@ -37,7 +37,9 @@ fun ServiceRequestsDialog(
     language: AppLanguage,
     onDismiss: () -> Unit,
     onRefresh: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    isCraftsman: Boolean = false,
+    onUpdateStatus: (remoteRequestId: String, newStatus: String) -> Unit = { _, _ -> }
 ) {
     val pendingCount = requests.count { it.syncState != ServiceRequestEntity.SYNCED }
     AlertDialog(
@@ -72,7 +74,7 @@ fun ServiceRequestsDialog(
                 } else {
                     LazyColumn(modifier = Modifier.height(360.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(requests, key = { it.id }) { request ->
-                            RequestRow(request, language, onRetry)
+                            RequestRow(request, language, onRetry, isCraftsman, onUpdateStatus)
                         }
                     }
                 }
@@ -90,7 +92,9 @@ fun ServiceRequestsDialog(
 private fun RequestRow(
     request: ServiceRequestEntity,
     language: AppLanguage,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    isCraftsman: Boolean,
+    onUpdateStatus: (remoteRequestId: String, newStatus: String) -> Unit
 ) {
     val status = when (request.status) {
         ServiceRequestEntity.STATUS_OPEN -> if (language == AppLanguage.AR) "مفتوح" else if (language == AppLanguage.FR) "Ouverte" else "Open"
@@ -106,10 +110,21 @@ private fun RequestRow(
         ServiceRequestEntity.SYNC_FAILED -> if (language == AppLanguage.AR) "لم تتم المزامنة" else if (language == AppLanguage.FR) "Synchronisation échouée" else "Sync failed"
         else -> if (language == AppLanguage.AR) "بانتظار المزامنة" else if (language == AppLanguage.FR) "En attente" else "Pending sync"
     }
+    val otherParty = when {
+        isCraftsman && request.customerDisplayName != null ->
+            (if (language == AppLanguage.AR) "العميل: " else if (language == AppLanguage.FR) "Client: " else "Customer: ") + request.customerDisplayName
+        !isCraftsman && request.craftsmanName != null ->
+            (if (language == AppLanguage.AR) "الحرفي: " else if (language == AppLanguage.FR) "Artisan: " else "Craftsman: ") + request.craftsmanName
+        else -> ""
+    }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))) {
         Column(Modifier.padding(12.dp)) {
             Text(request.categoryKey, fontWeight = FontWeight.Bold)
             Text("${request.wilayaCode} • ${request.commune}", style = MaterialTheme.typography.bodySmall)
+            if (otherParty.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(otherParty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(4.dp))
             Text(request.description, maxLines = 3, style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
@@ -127,6 +142,55 @@ private fun RequestRow(
                         modifier = Modifier.testTag("retry_request_button")
                     ) { Text(if (language == AppLanguage.AR) "إعادة" else if (language == AppLanguage.FR) "Réessayer" else "Retry") }
                 }
+                if (isCraftsman && request.syncState == ServiceRequestEntity.SYNCED) {
+                    Spacer(Modifier.weight(1f))
+                    craftsmanActions(request, language, onUpdateStatus)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun craftsmanActions(
+    request: ServiceRequestEntity,
+    language: AppLanguage,
+    onUpdateStatus: (String, String) -> Unit
+) {
+    when (request.status) {
+        ServiceRequestEntity.STATUS_OPEN -> {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_QUOTED) }
+                ) {
+                    Text(if (language == AppLanguage.AR) "أرسل تسعير" else if (language == AppLanguage.FR) "Deviser" else "Quote")
+                }
+                TextButton(
+                    onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_CANCELLED) }
+                ) {
+                    Text(if (language == AppLanguage.AR) "رفض" else if (language == AppLanguage.FR) "Refuser" else "Decline")
+                }
+            }
+        }
+        ServiceRequestEntity.STATUS_QUOTED -> {
+            TextButton(
+                onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_ACCEPTED) }
+            ) {
+                Text(if (language == AppLanguage.AR) "تأكيد القبول" else if (language == AppLanguage.FR) "Confirmer" else "Confirm accept")
+            }
+        }
+        ServiceRequestEntity.STATUS_ACCEPTED -> {
+            TextButton(
+                onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_IN_PROGRESS) }
+            ) {
+                Text(if (language == AppLanguage.AR) "بدء التنفيذ" else if (language == AppLanguage.FR) "Démarrer" else "Start work")
+            }
+        }
+        ServiceRequestEntity.STATUS_IN_PROGRESS -> {
+            TextButton(
+                onClick = { onUpdateStatus(request.remoteId ?: request.id, ServiceRequestEntity.STATUS_COMPLETED) }
+            ) {
+                Text(if (language == AppLanguage.AR) "إكمال" else if (language == AppLanguage.FR) "Terminer" else "Complete")
             }
         }
     }
