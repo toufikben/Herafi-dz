@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.algeriacraftsmen.dzmprq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 9
-    versionName = "1.0.9"
+    versionCode = 10
+    versionName = "1.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -44,7 +44,7 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.getByName("debugConfig")
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }

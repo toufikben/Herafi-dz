@@ -6,7 +6,6 @@ import com.squareup.moshi.JsonClass
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
@@ -84,13 +83,6 @@ object SupabaseAuthApiProvider {
             .client(
                 OkHttpClient.Builder()
                     .addInterceptor(SupabaseAuthHeadersInterceptor())
-                    .addInterceptor(
-                        HttpLoggingInterceptor { message ->
-                            android.util.Log.d("SupabaseHttp", message)
-                        }.apply {
-                            if (BuildConfig.DEBUG) setLevel(HttpLoggingInterceptor.Level.BASIC)
-                        }
-                    )
                     .build()
             )
             .addConverterFactory(MoshiConverterFactory.create())
