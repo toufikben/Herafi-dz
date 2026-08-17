@@ -18,6 +18,8 @@ import com.example.data.model.SortOption
 import com.example.data.model.TradeCategories
 import com.example.data.model.TradeCategory
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -54,6 +56,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentUser = MutableStateFlow<com.example.data.db.UserEntity?>(null)
     val showAuthDialog = MutableStateFlow(false)
     val showServiceRequestsDialog = MutableStateFlow(false)
+    val showSettingsDialog = MutableStateFlow(false)
+    val requestNotificationsEnabled = MutableStateFlow(true)
+    val notificationIntervalSeconds = MutableStateFlow(30)
+    val craftsmenNotificationEnabled = MutableStateFlow(false)
+    val isCraftsmanAvailable = MutableStateFlow(true)
+    val passwordUpdateInProgress = MutableStateFlow(false)
+    val passwordUpdateResult = MutableStateFlow<String?>(null) // null | success message | error message
     val serviceRequests = MutableStateFlow<List<ServiceRequestEntity>>(emptyList())
     val userNotification = MutableStateFlow<String?>(null)
     var pendingAuthAction: String? = null // "RATE", "REQUEST_SERVICE", "REQUESTS" or "ACCOUNT"
@@ -98,6 +107,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }.take(220)
                 }
             }
+            // Background refresh: keep the cached list current while the user browses.
+            startCraftsmenSyncLoop()
         }
     }
 
@@ -126,7 +137,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Filter and sort the cached data once per relevant state change, then expose only the loaded page.
     private val allFilteredCraftsmen: StateFlow<List<CraftsmanEntity>> = combine(
         allCraftsmen,
-        filterState,
+        filterState.debounce(250).stateIn(viewModelScope, SharingStarted.Eagerly, filterState.value),
         bookmarkIds
     ) { craftsmen, filter, bookmarks ->
         var result = craftsmen
@@ -383,6 +394,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // requests (customer or craftsman role) and shows a system notification
     // when a new request arrives or a status changes.
     // ------------------------------------------------------------------
+    // Periodic craftsmen sync: pulls published profiles from Supabase every 60s so
+    // new craftsmen and rating changes appear without a manual refresh.
+    private fun startCraftsmenSyncLoop() {
+        viewModelScope.launch {
+            val sync = SupabaseCraftsmanSync(
+                dao = AppDatabase.getInstance(getApplication()).craftsmanDao(),
+                api = SupabaseApiProvider.create()
+            )
+            while (true) {
+                try {
+                    kotlinx.coroutines.delay(60_000L)
+                    when (val result = sync.refreshPublishedCraftsmen()) {
+                        is SyncResult.Success -> if (result.importedCount > 0) {
+                            userNotification.value = "تم تحديث ${result.importedCount} حرفي من الخادم"
+                        }
+                        else -> Unit // Keep browsing on cached Room data; next tick retries.
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // Swallow transient failures; the next tick will retry.
+                }
+            }
+        }
+    }
+
     fun startLiveRequestUpdates() {
         viewModelScope.launch {
             var lastSnapshot = emptySet<String>()
@@ -666,7 +703,204 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun logoutUser() {
         userRepository.logoutUser()
         currentUser.value = null
+        showSettingsDialog.value = false
         userNotification.value = "تم تسجيل الخروج"
+    }
+
+    // ------------------------------------------------------------------
+    // Settings screen: account (password change, logout), notification
+    // preferences, and craftsman profile editing / reset.
+    // ------------------------------------------------------------------
+    fun openSettings() {
+        val user = currentUser.value
+        if (user != null && user.userType.equals("CRAFTSMAN", ignoreCase = true)) {
+            viewModelScope.launch {
+                val local = repository.getCraftsmanByOwnerId(user.id)
+                isCraftsmanAvailable.value = local?.isAvailable ?: true
+            }
+        }
+        showSettingsDialog.value = true
+    }
+
+    fun closeSettings() {
+        showSettingsDialog.value = false
+        passwordUpdateResult.value = null
+    }
+
+    fun changePassword(newPassword: String) {
+        if (passwordUpdateInProgress.value) return
+        viewModelScope.launch {
+            passwordUpdateInProgress.value = true
+            passwordUpdateResult.value = null
+            val ok = runCatching { userRepository.changePassword(newPassword) }.getOrDefault(false)
+            passwordUpdateResult.value = if (ok) {
+                "تم تغيير كلمة المرور بنجاح"
+            } else {
+                "تعذر تغيير كلمة المرور. تحقق من اتصالك بالإنترنت وحاول مرة أخرى"
+            }
+            passwordUpdateInProgress.value = false
+        }
+    }
+
+    fun toggleRequestNotifications(enabled: Boolean) {
+        requestNotificationsEnabled.value = enabled
+    }
+
+    fun toggleCraftsmanNotifications(enabled: Boolean) {
+        craftsmenNotificationEnabled.value = enabled
+    }
+
+    fun updateNotificationInterval(seconds: Int) {
+        notificationIntervalSeconds.value = seconds
+    }
+
+    fun toggleCraftsmanAvailability(available: Boolean) {
+        isCraftsmanAvailable.value = available
+        viewModelScope.launch {
+            val uid = userRepository.getCurrentUserId() ?: return@launch
+            val local = repository.getCraftsmanByOwnerId(uid) ?: run {
+                repository.registerNewCraftsman(
+                    ownerId = uid,
+                    name = currentUser.value?.fullName ?: "حرفي",
+                    categoryKey = "BUILDER",
+                    phone = currentUser.value?.phone ?: "",
+                    whatsapp = "",
+                    wilayaCode = currentUser.value?.wilayaCode ?: 16,
+                    commune = "",
+                    dailyRateDzd = 0,
+                    yearsExperience = 0,
+                    description = "",
+                    skillsCsv = ""
+                )
+                repository.getCraftsmanByOwnerId(uid)
+            } ?: return@launch
+            repository.updateOwnedCraftsmanAvailability(local.id, available)
+            val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            val body = com.example.data.remote.UpsertCraftsmanBody(
+                owner_id = uid,
+                name = local.name,
+                category_key = local.categoryKey,
+                wilaya_code = local.wilayaCode.coerceIn(0, 58).toString(),
+                commune = local.commune,
+                phone = local.phone,
+                whatsapp = local.whatsapp.ifBlank { local.phone },
+                description = local.description,
+                daily_rate_dzd = local.dailyRateDzd,
+                years_experience = local.yearsExperience,
+                skills_csv = local.skillsCsv,
+                status = if (available) "published" else "pending",
+                is_available = available
+            )
+            val syncResult = runCatching { api?.upsertOwnedCraftsman(profile = body) }
+            if (syncResult.isFailure || syncResult.getOrNull() == null) {
+                userNotification.value = "تم تحديث التوفر محليًا؛ تعذر مزامنته مع الخادم"
+            } else {
+                userNotification.value = if (available) "أصبحت متاحًا لاستقبال الطلبات" else "أصبحت غير متاح مؤقتًا"
+            }
+        }
+    }
+
+    fun updateCraftsmanField(field: String, value: String) {
+        if (field != "profile") return
+        val parts = value.split("|")
+        if (parts.size != 6) return
+        val uid = userRepository.getCurrentUserId() ?: return
+        val name = parts.getOrNull(0).orEmpty()
+        val phone = parts.getOrNull(1).orEmpty()
+        val wilaya = parts.getOrNull(2).orEmpty()
+        val commune = parts.getOrNull(3).orEmpty()
+        val rate = parts.getOrNull(4).orEmpty()
+        val description = parts.getOrNull(5).orEmpty()
+        viewModelScope.launch {
+            val local = repository.getCraftsmanByOwnerId(uid) ?: run {
+                repository.registerNewCraftsman(
+                    ownerId = uid,
+                    name = name.ifBlank { currentUser.value?.fullName ?: "حرفي" },
+                    categoryKey = "BUILDER",
+                    phone = phone,
+                    whatsapp = "",
+                    wilayaCode = wilaya.toIntOrNull()?.coerceIn(1, 58) ?: 16,
+                    commune = commune,
+                    dailyRateDzd = rate.toIntOrNull()?.coerceIn(0, 10_000_000) ?: 0,
+                    yearsExperience = 0,
+                    description = description,
+                    skillsCsv = ""
+                )
+                repository.getCraftsmanByOwnerId(uid)
+            } ?: return@launch
+            val available = local.isAvailable
+            val newName = name.ifBlank { local.name }
+            val newPhone = phone.ifBlank { local.phone }
+            val newWilaya = wilaya.toIntOrNull()?.coerceIn(1, 58) ?: local.wilayaCode
+            val newCommune = commune.ifBlank { local.commune }
+            val newRate = rate.toIntOrNull()?.coerceIn(0, 10_000_000) ?: local.dailyRateDzd
+            val newDescription = description.ifBlank { local.description }
+            repository.updateOwnedCraftsmanProfile(
+                id = local.id,
+                name = newName,
+                phone = newPhone,
+                wilayaCode = newWilaya,
+                commune = newCommune,
+                dailyRateDzd = newRate,
+                description = newDescription,
+                available = available
+            )
+            val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            val body = com.example.data.remote.UpsertCraftsmanBody(
+                owner_id = uid,
+                name = newName,
+                category_key = local.categoryKey,
+                wilaya_code = newWilaya.toString(),
+                commune = newCommune,
+                phone = newPhone,
+                whatsapp = local.whatsapp.ifBlank { newPhone },
+                description = newDescription,
+                daily_rate_dzd = newRate,
+                years_experience = local.yearsExperience,
+                skills_csv = local.skillsCsv,
+                status = if (available) "published" else "pending",
+                is_available = available
+            )
+            val syncResult = runCatching { api?.upsertOwnedCraftsman(profile = body) }
+            if (syncResult.isFailure || syncResult.getOrNull() == null) {
+                userNotification.value = "تم حفظ التعديلات محليًا؛ تعذر مزامنتها مع الخادم"
+            } else {
+                userNotification.value = "تم تحديث ملفك الحرفي بنجاح"
+            }
+        }
+    }
+
+    fun resetCraftsman() {
+        val uid = userRepository.getCurrentUserId() ?: return
+        viewModelScope.launch {
+            val local = repository.getCraftsmanByOwnerId(uid)
+            if (local != null) {
+                repository.deleteOwnedCraftsman(local.id)
+            }
+            // REST DELETE on craftsmen is not reliably supported; reset the remote row to
+            // the unverified "pending" state so it disappears from the published directory.
+            val api = SupabaseApiProvider.create(userRepository.getSupabaseAccessToken())
+            if (local != null) {
+                val pendingBody = com.example.data.remote.UpsertCraftsmanBody(
+                    owner_id = uid,
+                    name = local.name,
+                    category_key = local.categoryKey,
+                    wilaya_code = local.wilayaCode.coerceIn(1, 58).toString(),
+                    commune = local.commune,
+                    phone = local.phone,
+                    whatsapp = local.whatsapp.ifBlank { null },
+                    description = local.description,
+                    daily_rate_dzd = local.dailyRateDzd,
+                    years_experience = local.yearsExperience,
+                    skills_csv = local.skillsCsv,
+                    status = "pending",
+                    is_available = false
+                )
+                runCatching { api?.updateOwnedCraftsman(ownerId = "eq.$uid", body = pendingBody) }
+            }
+            userNotification.value = "تم إعادة تعيين ملفك الحرفي إلى الحالة الأولية"
+            closeSettings()
+        }
     }
 
     fun submitRating(
@@ -680,6 +914,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         val workerId = selectedCraftsmanId.value ?: return
         viewModelScope.launch {
+            // Block self-review on the UI side as well (server trigger also enforces it)
+            val selectedEntity = selectedCraftsman.value
+            if (selectedEntity?.ownerId != null && selectedEntity.ownerId == currentUser.value?.id) {
+                userNotification.value = "لا يمكنك تقييم ملفك الخاص"
+                showRatingDialog.value = false
+                return@launch
+            }
             repository.submitReview(
                 craftsmanId = workerId,
                 reviewerName = reviewerName,
@@ -689,7 +930,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 punctualityScore = punctualityScore,
                 priceScore = priceScore,
                 tagsCsv = tagsCsv,
-                currentCraftsman = selectedCraftsman.value
+                currentCraftsman = selectedEntity,
+                currentUserId = currentUser.value?.id
             )
             showRatingDialog.value = false
             userNotification.value = "تمت إضافة تقييمك بنجاح! شكراً لك."

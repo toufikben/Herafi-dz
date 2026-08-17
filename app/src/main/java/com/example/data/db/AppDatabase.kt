@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [CraftsmanEntity::class, ReviewEntity::class, BookmarkEntity::class, UserEntity::class, ServiceRequestEntity::class],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,6 +52,13 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE service_requests ADD COLUMN pendingPhotoPaths TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS craftsmen_owner_idx ON craftsmen(ownerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS craftsmen_available_idx ON craftsmen(isAvailable, ratingScore DESC)")
             }
         }
 
@@ -118,7 +125,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "herafi_dz_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build()
                 INSTANCE = instance
                 instance

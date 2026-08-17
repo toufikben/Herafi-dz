@@ -33,6 +33,9 @@ class SupabaseCraftsmanSync(
     suspend fun upsertOwnedCraftsman(ownerId: String, local: CraftsmanEntity): SyncResult {
         val supabaseApi = api ?: return SyncResult.NotConfigured
         return runCatching {
+            // PostgREST cannot use ON CONFLICT / merge-duplicates against the partial
+            // unique index on owner_id, so resolve by fetching first, then PATCH or POST.
+            val existing = supabaseApi.getCraftsmanForOwner(ownerId = "eq.$ownerId").firstOrNull()
             val body = UpsertCraftsmanBody(
                 owner_id = ownerId,
                 name = local.name.trim().take(80),
@@ -45,11 +48,17 @@ class SupabaseCraftsmanSync(
                 daily_rate_dzd = local.dailyRateDzd.coerceIn(0, 10_000_000),
                 years_experience = local.yearsExperience.coerceIn(0, 80),
                 skills_csv = local.skillsCsv.trim().take(500),
-                status = if (local.isAvailable) "published" else "pending"
+                status = if (local.isAvailable) "published" else "pending",
+                is_available = local.isAvailable
             )
-            val response = supabaseApi.upsertOwnedCraftsman(profile = body)
-            val remote = response.firstOrNull()
-                ?: throw IllegalStateException("Supabase returned no craftsman profile")
+            val remote = if (existing != null) {
+                supabaseApi.updateOwnedCraftsman(ownerId = "eq.$ownerId", body = body).firstOrNull()
+                    ?: throw IllegalStateException("Supabase returned no craftsman profile")
+            } else {
+                val response = supabaseApi.upsertOwnedCraftsman(profile = body)
+                response.firstOrNull()
+                    ?: throw IllegalStateException("Supabase returned no craftsman profile")
+            }
             val restored = remote.toLocalEntity(ownerIdOverride = ownerId, userCreated = true)
             dao.insertCraftsman(restored)
             dao.deleteOtherCraftsmanRowsForOwner(ownerId, restored.id)
@@ -133,7 +142,7 @@ private fun RemoteCraftsman.toLocalEntity(
         yearsExperience = years_experience.coerceIn(0, 80),
         description = description.trim().take(1_000),
         skillsCsv = skills_csv.trim().take(500),
-        isAvailable = status == "published",
+        isAvailable = is_available,
         avatarIndex = kotlin.math.abs(id.hashCode()) % 12,
         isUserCreated = userCreated,
         distanceKmSimulated = 0.0,

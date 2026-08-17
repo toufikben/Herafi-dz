@@ -52,6 +52,7 @@ create table if not exists public.craftsmen (
     years_experience integer not null default 0 check (years_experience between 0 and 80),
     skills_csv text not null default '' check (char_length(skills_csv) <= 500),
     is_verified boolean not null default false,
+    is_available boolean not null default true,
     status text not null default 'pending' check (status in ('pending', 'published', 'suspended')),
     rating_score numeric(3,1) not null default 0 check (rating_score between 0 and 10),
     rating_count integer not null default 0 check (rating_count >= 0),
@@ -321,3 +322,31 @@ create policy "request-photos-delete-own"
 create policy "request-photos-select-public"
     on storage.objects for select
     using (bucket_id = 'request-photos');
+
+-- ============================================================================
+-- SELF-REVIEW PROTECTION
+-- A craftsman owner must never be able to review their own profile.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.review_self_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+begin
+    if exists (
+        select 1 from public.craftsmen c
+        where c.id = new.craftsman_id and c.owner_id = auth.uid()
+    ) then
+        raise exception 'cannot review your own craftsman profile';
+    end if;
+    return new;
+end;
+$$;
+
+DROP TRIGGER IF EXISTS reviews_self_guard ON public.reviews;
+CREATE TRIGGER reviews_self_guard
+BEFORE INSERT OR UPDATE ON public.reviews
+FOR EACH ROW
+WHEN (auth.uid() IS NOT NULL)
+EXECUTE FUNCTION public.review_self_guard();

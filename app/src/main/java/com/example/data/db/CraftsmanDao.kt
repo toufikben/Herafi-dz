@@ -11,6 +11,13 @@ interface CraftsmanDao {
     @Query("SELECT * FROM craftsmen ORDER BY ratingScore DESC LIMIT :limit")
     fun getAllCraftsmen(limit: Int = Int.MAX_VALUE): Flow<List<CraftsmanEntity>>
 
+    /** Paged query used by the UI to avoid materializing the full list on every scroll tick. */
+    @Query("SELECT * FROM craftsmen ORDER BY ratingScore DESC LIMIT :limit OFFSET :offset")
+    fun getCraftsmenPage(limit: Int, offset: Int): Flow<List<CraftsmanEntity>>
+
+    @Query("SELECT * FROM craftsmen WHERE categoryKey = :categoryKey AND isAvailable = :available ORDER BY ratingScore DESC LIMIT :limit")
+    fun getCraftsmenByCategory(categoryKey: String, available: Boolean, limit: Int): Flow<List<CraftsmanEntity>>
+
     @Query("SELECT COUNT(*) FROM craftsmen")
     fun countCraftsmen(): kotlinx.coroutines.flow.Flow<Int>
 
@@ -29,8 +36,17 @@ interface CraftsmanDao {
     @Query("DELETE FROM craftsmen WHERE ownerId = :ownerId AND id != :keepId")
     suspend fun deleteOtherCraftsmanRowsForOwner(ownerId: String, keepId: String)
 
+    @Query("DELETE FROM craftsmen WHERE id = :id")
+    suspend fun deleteCraftsmanById(id: String)
+
     @Query("UPDATE craftsmen SET ratingScore = :newScore, ratingCount = :newCount WHERE id = :id")
     suspend fun updateCraftsmanRating(id: String, newScore: Double, newCount: Int)
+
+    @Query("UPDATE craftsmen SET isAvailable = :available WHERE id = :id")
+    suspend fun updateCraftsmanAvailability(id: String, available: Boolean)
+
+    @Query("UPDATE craftsmen SET name = :name, phone = :phone, wilayaCode = :wilayaCode, commune = :commune, dailyRateDzd = :dailyRateDzd, description = :description, isAvailable = :available WHERE id = :id")
+    suspend fun updateCraftsmanProfile(id: String, name: String, phone: String, wilayaCode: Int, commune: String, dailyRateDzd: Int, description: String, available: Boolean)
 
     // Reviews
     @Query("SELECT * FROM reviews WHERE craftsmanId = :craftsmanId ORDER BY timestamp DESC")

@@ -8,6 +8,7 @@ import com.example.data.db.UserDao
 import com.example.data.db.UserEntity
 import com.example.data.remote.SupabaseAuthApi
 import com.example.data.remote.SupabaseAuthApiProvider
+import com.example.data.remote.SupabaseApiProvider
 import com.example.data.remote.SupabaseSignInRequest
 import com.example.data.remote.SupabaseSignUpRequest
 import com.example.data.remote.UpsertProfileBody
@@ -270,6 +271,33 @@ class UserRepository(
                 )
             )
         }
+    }
+
+    /**
+     * Change the current user's password via the Supabase Auth REST API.
+     * Stores the new session tokens when the API returns them.
+     */
+    suspend fun changePassword(newPassword: String): Boolean = try {
+        val token = getSupabaseAccessToken()
+        val api = SupabaseApiProvider.create(token) ?: return false
+        val response = api.postAuth(mapOf("password" to newPassword))
+        if (response.isSuccessful) {
+            val body = response.body()
+            if (body is Map<*, *>) {
+                getCurrentUserId()?.let { uid ->
+                    saveSession(
+                        uid,
+                        body["access_token"] as? String,
+                        body["refresh_token"] as? String
+                    )
+                }
+            }
+            true
+        } else {
+            false
+        }
+    } catch (e: Exception) {
+        false
     }
 
     fun logoutUser() {

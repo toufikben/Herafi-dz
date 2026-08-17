@@ -86,7 +86,9 @@ import com.example.ui.components.shareCraftsmanProfile
 import com.example.ui.components.RatingSubmissionDialog
 import com.example.ui.components.ServiceRequestDialog
 import com.example.ui.components.ServiceRequestsDialog
+import com.example.ui.components.SettingsDialog
 import com.example.ui.components.TradeCategoryChips
+import androidx.compose.material.icons.filled.Settings
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.NavyPrimary
 
@@ -109,8 +111,15 @@ fun HomeScreen(
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val showAuthDialog by viewModel.showAuthDialog.collectAsStateWithLifecycle()
     val showServiceRequestsDialog by viewModel.showServiceRequestsDialog.collectAsStateWithLifecycle()
+    val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
     val serviceRequests by viewModel.serviceRequests.collectAsStateWithLifecycle()
     val notificationMessage by viewModel.userNotification.collectAsStateWithLifecycle()
+    val requestNotificationsEnabled by viewModel.requestNotificationsEnabled.collectAsStateWithLifecycle()
+    val notificationIntervalSeconds by viewModel.notificationIntervalSeconds.collectAsStateWithLifecycle()
+    val craftsmenNotificationEnabled by viewModel.craftsmenNotificationEnabled.collectAsStateWithLifecycle()
+    val isCraftsmanAvailable by viewModel.isCraftsmanAvailable.collectAsStateWithLifecycle()
+    val passwordUpdateInProgress by viewModel.passwordUpdateInProgress.collectAsStateWithLifecycle()
+    val passwordUpdateResult by viewModel.passwordUpdateResult.collectAsStateWithLifecycle()
 
     val language = filterState.selectedLanguage
     val layoutDirection = if (language.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -178,6 +187,16 @@ fun HomeScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = NavyPrimary),
                     actions = {
                         if (currentUser != null) {
+                            IconButton(
+                                onClick = { viewModel.openSettings() },
+                                modifier = Modifier.testTag("settings_icon_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "الإعدادات",
+                                    tint = Color.White
+                                )
+                            }
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
                                 color = Color.White.copy(alpha = 0.15f),
@@ -557,6 +576,28 @@ fun HomeScreen(
                         onUpdateStatus = { remoteRequestId, newStatus ->
                             viewModel.updateServiceRequestStatus(remoteRequestId, newStatus)
                         }
+                    )
+                }
+                if (showSettingsDialog) {
+                    SettingsDialog(
+                        currentUser = currentUser,
+                        isCraftsman = currentUser?.userType.equals("CRAFTSMAN", ignoreCase = true),
+                        language = language,
+                        requestNotificationsEnabled = requestNotificationsEnabled,
+                        notificationIntervalSeconds = notificationIntervalSeconds,
+                        isCraftsmanAvailable = isCraftsmanAvailable,
+                        craftsmenNotificationEnabled = craftsmenNotificationEnabled,
+                        isUpdatingPassword = passwordUpdateInProgress,
+                        passwordResult = passwordUpdateResult,
+                        onDismiss = { viewModel.closeSettings() },
+                        onChangePassword = { newPassword -> viewModel.changePassword(newPassword) },
+                        onLogout = { viewModel.logoutUser() },
+                        onResetCraftsman = { viewModel.resetCraftsman() },
+                        onUpdateCraftsmanField = { field, value -> viewModel.updateCraftsmanField(field, value) },
+                        onToggleRequestNotifications = { enabled -> viewModel.toggleRequestNotifications(enabled) },
+                        onToggleCraftsmanAvailability = { available -> viewModel.toggleCraftsmanAvailability(available) },
+                        onToggleCraftsmanNotifications = { enabled -> viewModel.toggleCraftsmanNotifications(enabled) },
+                        onUpdateNotificationInterval = { seconds -> viewModel.updateNotificationInterval(seconds) }
                     )
                 }
 

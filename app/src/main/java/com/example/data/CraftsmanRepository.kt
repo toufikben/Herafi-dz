@@ -55,7 +55,8 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
         punctualityScore: Double,
         priceScore: Double,
         tagsCsv: String,
-        currentCraftsman: CraftsmanEntity?
+        currentCraftsman: CraftsmanEntity?,
+        currentUserId: String? = null
     ) {
         val normalizedComment = comment.trim().take(500)
         val normalizedReviewer = reviewerName.trim().take(80).ifBlank { "مستعمل التطبيق" }
@@ -81,6 +82,23 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
             val newAverage = ((oldScore * oldCount) + normalizedScore) / newCount
             val roundedAverage = Math.round(newAverage * 10.0) / 10.0
             dao.updateCraftsmanRating(craftsmanId, roundedAverage, newCount)
+        }
+
+        // Upload the review to Supabase so every device can see it. The
+        // server-side trigger review_self_guard additionally blocks
+        // self-reviewing, and a blank reviewer_id is rejected by RLS.
+        if (craftsmanId.startsWith("remote_") && !currentUserId.isNullOrBlank()) {
+            runCatching {
+                com.example.data.remote.SupabaseApiProvider.create()?.createReview(
+                    com.example.data.remote.CreateReviewBody(
+                        id = UUID.randomUUID().toString(),
+                        craftsman_id = craftsmanId.removePrefix("remote_"),
+                        reviewer_id = currentUserId,
+                        score_ten = normalizedScore,
+                        comment = normalizedComment.ifBlank { normalizedReviewer }
+                    )
+                )
+            }
         }
     }
 
@@ -124,5 +142,26 @@ class CraftsmanRepository(private val dao: CraftsmanDao) {
             ownerId = ownerId
         )
         dao.insertCraftsman(newWorker)
+    }
+
+    suspend fun updateOwnedCraftsmanAvailability(id: String, available: Boolean) {
+        dao.updateCraftsmanAvailability(id, available)
+    }
+
+    suspend fun updateOwnedCraftsmanProfile(
+        id: String,
+        name: String,
+        phone: String,
+        wilayaCode: Int,
+        commune: String,
+        dailyRateDzd: Int,
+        description: String,
+        available: Boolean
+    ) {
+        dao.updateCraftsmanProfile(id, name, phone, wilayaCode, commune, dailyRateDzd, description, available)
+    }
+
+    suspend fun deleteOwnedCraftsman(id: String) {
+        dao.deleteCraftsmanById(id)
     }
 }

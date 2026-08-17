@@ -13,6 +13,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.PATCH
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -28,6 +29,12 @@ interface SupabaseApi {
         @Query("select") select: String = "*",
         @Query("order") order: String = "rating_score.desc"
     ): List<RemoteCraftsman>
+
+    @POST("rest/v1/reviews")
+    @Headers("Content-Profile: public", "Prefer: return=minimal")
+    suspend fun createReview(
+        @Body review: CreateReviewBody
+    )
 
     @GET("rest/v1/reviews")
     @Headers("Accept-Profile: public")
@@ -48,7 +55,6 @@ interface SupabaseApi {
     @POST("rest/v1/craftsmen")
     @Headers("Content-Profile: public", "Prefer: resolution=merge-duplicates, return=representation")
     suspend fun upsertOwnedCraftsman(
-        @Query("on_conflict") onConflict: String = "owner_id",
         @Body profile: UpsertCraftsmanBody
     ): List<RemoteCraftsman>
 
@@ -100,6 +106,27 @@ interface SupabaseApi {
         @Query("id") requestId: String,
         @Body body: UpdateServiceRequestImagesBody
     ): List<RemoteServiceRequest>
+
+    @PATCH("rest/v1/craftsmen")
+    @Headers("Content-Profile: public", "Prefer: return=representation")
+    suspend fun updateOwnedCraftsman(
+        @Query("owner_id") ownerId: String,
+        @Body body: UpsertCraftsmanBody
+    ): List<RemoteCraftsman>
+
+    @HTTP(method = "DELETE", path = "rest/v1/craftsmen", hasBody = false)
+    @Headers("Content-Profile: public", "Prefer: return=minimal")
+    suspend fun deleteOwnedCraftsman(
+        @Query("owner_id") ownerId: String
+    ): retrofit2.Response<Unit>
+
+    /**
+     * Generic authenticated POST for Auth endpoints (e.g. changing the password).
+     */
+    @HTTP(method = "POST", path = "auth/v1/user", hasBody = true)
+    suspend fun postAuth(
+        @Body body: Map<String, String>
+    ): retrofit2.Response<Map<String, Any>>
 }
 
 @JsonClass(generateAdapter = true)
@@ -129,7 +156,17 @@ data class RemoteCraftsman(
     val is_verified: Boolean,
     val status: String,
     val rating_score: Double,
-    val rating_count: Int
+    val rating_count: Int,
+    val is_available: Boolean = true
+)
+
+@JsonClass(generateAdapter = true)
+data class CreateReviewBody(
+    val id: String,
+    val craftsman_id: String,
+    val reviewer_id: String,
+    val score_ten: Double,
+    val comment: String
 )
 
 @JsonClass(generateAdapter = true)
@@ -155,7 +192,8 @@ data class UpsertCraftsmanBody(
     val daily_rate_dzd: Int? = null,
     val years_experience: Int = 0,
     val skills_csv: String = "",
-    val status: String = "pending"
+    val status: String = "pending",
+    val is_available: Boolean = true
 )
 
 @JsonClass(generateAdapter = true)
